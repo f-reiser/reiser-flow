@@ -98,6 +98,22 @@ Beim Release sind dadurch **vier** Stellen zu ziehen, alle vom Plugin-Format erz
 Marketplace-Eintrag und verweigert das Release, wenn sie auseinanderliegen — den Gleichlauf
 *zwischen* den Plugins prüft es nicht, das ist Sache des Release-Ablaufs.
 
-Dieses Repository enthält bewusst **keinen ausführbaren Code**, den ein Projekt-Workflow
-über einen Tag holen müsste — es gibt also keine fünfte Stelle, die beim Hochzählen
-vergessen werden kann.
+## Wiederverwendbare Workflows
+
+Neben den Plugins liegt hier auch ausführbarer Code, den ein Projekt-Workflow über einen
+Tag holt, statt ihn in jedem Repository abzuschreiben — derselbe Grund wie bei den
+Skills: eine Quelle, sonst altert dieselbe Regel getrennt.
+
+| Workflow | wofür |
+|---|---|
+| `.github/workflows/issue-autoclose.yml` | schließt ein offenes Issue automatisch, sobald ein Pull Request auf dessen `issue-<nr>-*`-Branch vom Maintainer-Konto gemergt wurde |
+
+Eingebunden per `workflow_call`, referenziert über einen Tag — nie über `@main`, sonst
+ändert ein Merge hier sofort das Verhalten aller einbindenden Projekte, ohne Release und
+ohne dass es auffällt. Ein fremder Workflow holt sich damit ausführbaren Code über den
+Tag: Verschieben eines Tags ist ab hier keine Ordnungsfrage mehr, sondern
+sicherheitsrelevant (`semver-und-releases`).
+
+Eigenes Tag-Schema, unabhängig von den beiden Plugin-Versionen: `workflows--v<version>`,
+Quelle `.github/workflows/VERSION`. Dieser Code hat mit dem Prompt/Skill-Vertrag der
+Plugins nichts zu tun und muss nicht mit ihnen im Gleichschritt bleiben.
