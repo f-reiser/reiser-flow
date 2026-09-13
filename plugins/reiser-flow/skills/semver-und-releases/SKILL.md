@@ -191,7 +191,7 @@ hineingezogen.
 **Wie `<tag>` heißt.** Im Normalfall `v<version>`, also `v1.4.0`. Enthält ein Repository
 **mehrere getrennt veröffentlichte Einheiten** — etwa mehrere Plugins in einem
 Marketplace —, trägt der Tag den Namen der Einheit voran: `<name>--v<version>`, also
-`reiser-workflow--v0.3.0`. Sonst kollidieren zwei Einheiten beim ersten Mal, an dem sie
+`reiser-flow--v0.3.0`. Sonst kollidieren zwei Einheiten beim ersten Mal, an dem sie
 dieselbe Nummer erreichen.
 
 Welches Schema ein Repository verwendet, ist nichts, was man raten darf: `git tag --list`

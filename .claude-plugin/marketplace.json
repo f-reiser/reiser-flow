@@ -1,14 +1,14 @@
 {
-  "name": "reiser-skills",
-  "description": "Projektuebergreifende Arbeitsweise-Skills von f-reiser: reiser-workflow ueberall, reiser-lokal nur am eigenen Rechner.",
+  "name": "reiser-flow",
+  "description": "Projektuebergreifende Arbeitsweise-Skills von f-reiser: reiser-flow ueberall, reiser-flow-lokal nur am eigenen Rechner.",
   "owner": {
     "name": "f-reiser",
     "url": "https://github.com/f-reiser"
   },
   "plugins": [
     {
-      "name": "reiser-workflow",
-      "source": "./plugins/reiser-workflow",
+      "name": "reiser-flow",
+      "source": "./plugins/reiser-flow",
       "description": "Arbeitsweise fuer alle Softwareprojekte: GitHub-Issue-Workflow, Branch-Strategie, Versionierung und Releases, Dokumentationsmass, Repo-Hygiene, testgetriebenes Vorgehen, fremde Gegenlese.",
       "version": "1.2.0",
       "author": {
@@ -16,9 +16,9 @@
       }
     },
     {
-      "name": "reiser-lokal",
-      "source": "./plugins/reiser-lokal",
-      "description": "Ergaenzung zu reiser-workflow fuer Sitzungen am eigenen Rechner: Strukturarbeit ueber den Chat statt ueber Issues, Konten- und Repository-Ermittlung, Release-Befehle. Wird von unbeaufsichtigten GitHub-Laeufen bewusst nicht geladen.",
+      "name": "reiser-flow-lokal",
+      "source": "./plugins/reiser-flow-lokal",
+      "description": "Ergaenzung zu reiser-flow fuer Sitzungen am eigenen Rechner: Strukturarbeit ueber den Chat statt ueber Issues, Konten- und Repository-Ermittlung, Release-Befehle. Wird von unbeaufsichtigten GitHub-Laeufen bewusst nicht geladen.",
       "version": "1.2.0",
       "author": {
         "name": "f-reiser"
