@@ -29,3 +29,6 @@ jobs:
       #  Befund oben wirklich anschlaegt, statt nur gruen zu leuchten.
       - name: Selbsttest der Pruefung
         run: python .github/pruefe_marketplace.py --selbsttest
+
+      - name: Selbsttest des Issue-Autoclose-Workflows
+        run: python .github/skripte/issue_autoclose.py --selbsttest
