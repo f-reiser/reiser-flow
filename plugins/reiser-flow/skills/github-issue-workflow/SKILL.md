@@ -1,16 +1,19 @@
 ---
 name: github-issue-workflow
 description: >
-  Arbeitet GitHub-Issues eigenständig ab und hält die technische Kommunikation im Issue
-  statt im Chat: Reihenfolge nach Abhängigkeit und Priorität, Umsetzung im Feature-Branch,
-  Dokumentation im Issue, Pull Request — gemergt wird ausschließlich vom Nutzer. Offene
-  Fragen werden zu Labels „Rückfrage" oder „Entscheidung". Nutze diesen Skill, sobald
-  Issues abgearbeitet werden sollen („arbeite die Einarbeiten-Issues ab", „nimm dir Issue
-  12 vor", „schau ob was zu tun ist"), wenn nach dem Stand offener Issues gefragt wird,
-  wenn ein Issue in Code umgesetzt oder ein Bug untersucht werden soll, und wenn zu klären
-  ist, welches Label, welcher Issue-Typ oder welche Priorität richtig ist. Ebenso, wenn
-  neue Anforderungen erfasst werden — die laufen in diesen Projekten über Issues, nicht
-  über den Chat. Gilt für jedes Softwareprojekt mit GitHub-Anbindung.
+  Arbeitet GitHub-Issues eigenständig ab und hält die technische Kommunikation auf GitHub
+  statt im Chat — auch Antworten auf Review-Kommentare eines Pull Requests: Reihenfolge
+  nach Abhängigkeit und Priorität, Umsetzung im Feature-Branch, Dokumentation im Issue
+  oder als Reply auf den jeweiligen Kommentar, Pull Request — gemergt wird ausschließlich
+  vom Nutzer. Offene Fragen werden zu Labels „Rückfrage" oder „Entscheidung". Nutze diesen
+  Skill, sobald Issues abgearbeitet werden sollen („arbeite die Einarbeiten-Issues ab",
+  „nimm dir Issue 12 vor", „schau ob was zu tun ist"), wenn nach dem Stand offener Issues
+  gefragt wird, wenn ein Issue in Code umgesetzt oder ein Bug untersucht werden soll, und
+  wenn zu klären ist, welches Label, welcher Issue-Typ oder welche Priorität richtig ist.
+  Ebenso bei Review-Kommentaren eines Pull Requests („Kommentare einarbeiten", „auf den
+  Review antworten", Änderungen nach Feedback nachziehen) und wenn neue Anforderungen
+  erfasst werden — die laufen in diesen Projekten über Issues, nicht über den Chat. Gilt
+  für jedes Softwareprojekt mit GitHub-Anbindung.
 ---
 
 # Issues abarbeiten
@@ -18,10 +21,16 @@ description: >
 ## Wozu
 
 Der Chat ist ein schlechtes Gedächtnis: nicht durchsuchbar, nicht verlinkbar, für andere
-unsichtbar. Deshalb läuft die technische Kommunikation über Issues — Anforderungen,
-Rückfragen, Befunde und was tatsächlich geändert wurde.
+unsichtbar. Deshalb läuft die technische Kommunikation über GitHub — Issues, Pull
+Requests und ihre Kommentare —, nicht über den Chat: Anforderungen, Rückfragen, Befunde
+und was tatsächlich geändert wurde.
 
-Daraus folgt: **Was du beim Abarbeiten lernst, gehört ins Issue, nicht in die Chatantwort.**
+Daraus folgt: **Was du beim Abarbeiten lernst, gehört ins Issue oder den Pull Request,
+nicht in die Chatantwort.** Das gilt besonders dort, wo der Anlass selbst schon ein
+GitHub-Kommentar war — ein Review-Kommentar auf einem Pull Request bekommt seine Antwort
+als Reply auf genau diesen Kommentar (siehe „Auch Pull Requests tragen Label" unten für
+den technischen Weg), nicht nur eine Zusammenfassung im Chat. Eine kurze Zusammenfassung
+im Chat bleibt daneben in Ordnung — sie ersetzt die Antwort auf GitHub nicht.
 
 Vier Skills gelten immer mit: `git-branch-strategie` (Branches, Merges, Konto — **vor dem
 ersten Commit lesen**), `test-driven-development` (für jede Änderung am Code),
@@ -45,6 +54,19 @@ ein neues Issue aufzumachen. Dass Label für beides gelten, steht in
 
 Gearbeitet wird dann auf dem **bestehenden** Branch des Pull Requests, nicht auf einem
 neuen. Vorher nach `git-branch-strategie` auf den Quellbranch rebasen.
+
+**Trägt ein Review-Kommentar die Anforderung, antwortet die Umsetzung dort — als Reply
+auf genau diesen Kommentar**, nicht nur im Pull-Request-Text oder im Chat:
+
+```bash
+gh api --method POST repos/<owner>/<repo>/pulls/<nr>/comments \
+  -F body="..." -F in_reply_to=<kommentar-id>
+```
+
+Je Kommentar eine eigene, kurze Antwort — was geändert wurde und wo, oder, bei einer
+reinen Rückfrage im Kommentar, die inhaltliche Antwort selbst. Mehrere Kommentare in
+einer Sammelantwort zu verrühren nimmt dem Autor die Möglichkeit, einzelne Threads
+aufzulösen.
 
 ## Welches Issue zuerst
 
