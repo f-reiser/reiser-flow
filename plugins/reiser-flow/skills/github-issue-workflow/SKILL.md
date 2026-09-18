@@ -32,10 +32,11 @@ als Reply auf genau diesen Kommentar (siehe „Auch Pull Requests tragen Label" 
 den technischen Weg), nicht nur eine Zusammenfassung im Chat. Eine kurze Zusammenfassung
 im Chat bleibt daneben in Ordnung — sie ersetzt die Antwort auf GitHub nicht.
 
-Drei Skills gelten immer mit: `git-branch-strategie` (Branches, Merges, Konto — **vor dem
-ersten Commit lesen**), `test-driven-development` (für jede Änderung am Code) und
-`erklaeren-mit-mass` (für jeden Text, den du schreibst). `fremde-gegenlese` kommt dazu,
-aber nur auf Anforderung — siehe Schritt 7.
+Vier Skills gelten immer mit: `git-branch-strategie` (Branches, Merges, Konto — **vor dem
+ersten Commit lesen**), `test-driven-development` (für jede Änderung am Code),
+`erklaeren-mit-mass` (für jeden Text, den du schreibst) und `projektsprache` (in welcher
+Sprache — das gilt schon für dieses Issue selbst). `fremde-gegenlese` kommt dazu, aber nur
+auf Anforderung — siehe Schritt 7.
 
 ## Welches Repository
 
