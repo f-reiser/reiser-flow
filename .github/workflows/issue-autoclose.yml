@@ -39,17 +39,16 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Ref dieses wiederverwendbaren Workflows ermitteln
-        id: ref
-        shell: bash
-        run: echo "ref=${GITHUB_WORKFLOW_REF#*@}" >> "$GITHUB_OUTPUT"
-        env:
-          GITHUB_WORKFLOW_REF: ${{ github.workflow_ref }}
-
+      #  job.workflow_sha, nicht github.workflow_ref: In einem aufgerufenen Workflow
+      #  zeigt der github-Kontext auf den AUFRUFER. Hier stand bis zum 18.09.2026
+      #  dessen Ref - der Checkout holte damit den main-Stand dieses Repositories
+      #  statt des Tags, auf den der Aufrufer gepinnt hatte, und auf einem
+      #  Feature-Branch des Aufrufers waere er ins Leere gelaufen.
+      #  Begruendung, Belege und die Pruefung dagegen: .github/pruefe_workflows.py.
       - uses: actions/checkout@v7
         with:
           repository: f-reiser/reiser-flow
-          ref: ${{ steps.ref.outputs.ref }}
+          ref: ${{ job.workflow_sha }}
           path: _reiser-flow
           sparse-checkout: .github/skripte
 

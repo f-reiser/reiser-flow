@@ -47,6 +47,14 @@ RICHTIGER_SELBSTBEZUG = "job.workflow_sha"
 
 DIESES_REPOSITORY = "f-reiser/reiser-flow"
 
+#  Die beiden Arten, dieses Repository zu HOLEN: der "repository:"-Schluessel von
+#  actions/checkout und eine Klon-Adresse. Bewusst nicht jede Erwaehnung des
+#  Namens - er steht auch in Kommentaren und in Kommentartexten, die ein Workflow
+#  an ein Issue schreibt, und dort ist er harmlos.
+HOLT_DIESES_REPOSITORY = re.compile(
+    r"repository\s*:\s*" + re.escape(DIESES_REPOSITORY) + r"\b"
+    r"|github\.com[:/]" + re.escape(DIESES_REPOSITORY) + r"(\.git)?\b")
+
 #  Woerter, die ein aufrufbarer Workflow nicht kennen darf. Sie stammen aus dem
 #  Projekt, aus dem diese Workflows gekommen sind - taucht eines auf, ist beim
 #  Herausloesen etwas liegengeblieben.
@@ -118,9 +126,10 @@ def befunde(name, roh):
                                  "AUFRUFER - %s verwenden"
                           % (falsch, RICHTIGER_SELBSTBEZUG))
 
-            if DIESES_REPOSITORY in block and RICHTIGER_SELBSTBEZUG not in block:
-                melde(zeile, "Selbstbezug auf %s ohne %s - der Stand ist nicht "
-                             "verriegelt" % (DIESES_REPOSITORY, RICHTIGER_SELBSTBEZUG))
+            if HOLT_DIESES_REPOSITORY.search(block) \
+                    and RICHTIGER_SELBSTBEZUG not in block:
+                melde(zeile, "holt %s ohne %s - der Stand ist nicht verriegelt"
+                      % (DIESES_REPOSITORY, RICHTIGER_SELBSTBEZUG))
 
             for wort in PROJEKTWOERTER:
                 if wort in block:
@@ -258,12 +267,27 @@ def selbsttest():
         fehler.append("schritte(): %d Bloecke statt 3 (Kopf + zwei Schritte)" % anzahl)
 
     #  Genau dieser Fall: Schritt A ist verriegelt, ein ZWEITER Selbstbezug nicht.
-    pruefe_text("zweiter Selbstbezug ohne Verriegelung", "muster.yml",
-                MUSTER + ("      - name: Nochmal holen" + ZL
-                          + "        run: git clone "
-                            "https://github.com/f-reiser/reiser-flow.git" + ZL), True)
+    #  Beide Klon-Schreibweisen, damit die Verengung auf "holen" nicht die eine
+    #  oder die andere durchlaesst.
+    for adresse in ("https://github.com/f-reiser/reiser-flow.git",
+                    "git@github.com:f-reiser/reiser-flow.git"):
+        pruefe_text("zweiter Selbstbezug ohne Verriegelung (%s)" % adresse,
+                    "muster.yml",
+                    MUSTER + ("      - name: Nochmal holen" + ZL
+                              + "        run: git clone " + adresse + ZL), True)
 
-    gesamt = 2 + len(FALSCHER_SELBSTBEZUG) + 1 + 1 + len(PROJEKTWOERTER) + 3 + 1 + 1 + 1
+    #  Gegenprobe zur Verengung: Der blosse NAME des Repositories ist harmlos. Er
+    #  steht in Kommentartexten, die ein Workflow an ein Issue schreibt - eine
+    #  Pruefung, die darauf anspringt, zwingt dazu, solche Texte zu verstuemmeln.
+    pruefe_text("Name in einem Meldungstext", "muster.yml",
+                MUSTER.replace(
+                    "        run: python3",
+                    "        run: echo 'durchgesetzt von f-reiser/reiser-flow'"
+                    + ZL + "        shell: bash" + ZL + "        #x: python3"),
+                False)
+
+    gesamt = (2 + len(FALSCHER_SELBSTBEZUG) + 1 + 1 + len(PROJEKTWOERTER)
+              + 3 + 1 + 1 + 2 + 1)
     for f in fehler:
         print("FEHLER: " + f)
     print("%d von %d Pruefungen bestanden." % (gesamt - len(fehler), gesamt))
