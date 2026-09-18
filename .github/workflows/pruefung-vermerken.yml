@@ -11,8 +11,19 @@ name: Pruefergebnis im Vorgang vermerken
 #       needs: pruefung
 #       if: always()
 #       uses: f-reiser/reiser-flow/.github/workflows/pruefung-vermerken.yml@<tag>
+#       permissions:            # MUSS der Aufrufer setzen
+#         contents: read
+#         issues: write
+#         pull-requests: read
 #       with:
 #         ergebnis: ${{ needs.pruefung.result }}
+#
+# "if: always()" gehoert zum Aufrufer und ist nicht optional: Gerade das ROTE
+# Ergebnis soll im Vorgang stehen, und ohne always() liefe dieser Job dann nicht.
+#
+# Ein aufgerufener Workflow kann Berechtigungen nur beibehalten oder senken, nie
+# erhoehen - was der Aufrufer nicht gibt, bekommt dieser Job auch dann nicht, wenn
+# er es unten anfordert.
 #
 # WOFUER DAS GUT IST
 # Ein Lauf, der eine angefangene Arbeit aufnimmt, muss als Erstes wissen: Stand
