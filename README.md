@@ -39,6 +39,7 @@ ein Release auslöst (ein Lauf darf gar keines bauen).
 | `semver-und-releases` | Versionsnummern, Tags, GitHub-Releases |
 | `erklaeren-mit-mass` | wie viel Erklärung ein Text verdient |
 | `repo-hygiene` | was in ein Repository gehört und was nicht |
+| `projektsprache` | in welcher Sprache ein Projekt kommuniziert — Code, Commits, GitHub, Chat |
 
 ### `reiser-flow-lokal`
 
