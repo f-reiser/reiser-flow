@@ -11,9 +11,10 @@ description: >
   gefragt wird, wenn ein Issue in Code umgesetzt oder ein Bug untersucht werden soll, und
   wenn zu klären ist, welches Label, welcher Issue-Typ oder welche Priorität richtig ist.
   Ebenso bei Review-Kommentaren eines Pull Requests („Kommentare einarbeiten", „auf den
-  Review antworten", Änderungen nach Feedback nachziehen) und wenn neue Anforderungen
-  erfasst werden — die laufen in diesen Projekten über Issues, nicht über den Chat. Gilt
-  für jedes Softwareprojekt mit GitHub-Anbindung.
+  Review antworten", Änderungen nach Feedback nachziehen), bei Research-Aufgaben und
+  Untersuchungsberichten (deren Ergebnis ins Issue gehört, nie in einen Pull Request), und
+  wenn neue Anforderungen erfasst werden — die laufen in diesen Projekten über Issues,
+  nicht über den Chat. Gilt für jedes Softwareprojekt mit GitHub-Anbindung.
 ---
 
 # Issues abarbeiten
@@ -149,6 +150,35 @@ pushen, sobald etwas Ganzes fertig ist, statt erst bei Schritt 6.**
 **Bei dauerhaft roten Tests:** wie eine Rückfrage behandeln (unten). Ein Issue, das rot
 bleibt und sein Label behält, wird beim nächsten Durchgang erneut gezogen und verbrennt
 jedes Mal Zeit.
+
+## Research-Aufgaben gehören ins Issue, nicht in den Pull Request
+
+Erkennungsmerkmal: Am Ende steht kein lauffähiges Ergebnis, sondern eine Aussage — ein
+Befund, eine Empfehlung, eine offene Entscheidung. Ein Pull Request ist für Änderungen am
+Code da; das hat dort nichts zu suchen, auch nicht als Begleittext zu zwei beiläufigen
+Dateiänderungen.
+
+Stattdessen:
+
+- **Issue-Typ `Task`.**
+- **Ergebnis in den Issue-Text** — Befund, Empfehlung, offene Fragen —, nicht als
+  Dateiänderung.
+- **Rückfragen als Kommentar** am selben Issue.
+- **Folgearbeiten referenzieren die Issue-Nummer**, statt den Befund zu wiederholen.
+
+**Grenzfall:** Entsteht neben dem Befund *auch* eine echte Änderung (etwa ein Dokument,
+das dauerhaft bleiben soll), geht diese Änderung in einen **eigenen** Pull Request, der
+auf das Issue verweist — der Bericht selbst bleibt im Issue, nicht im Pull-Request-Text.
+
+**Warum das zählt:** Ein Pull Request verschwindet beim Schließen aus dem Blick, ein
+Issue bleibt referenzierbar. `f-reiser/claude-skills#28` trug einen Untersuchungsbericht
+als Pull-Request-Inhalt; seine zwei Dateiänderungen wurden am Ende ersatzlos verworfen,
+und der Bericht musste von Hand in ein Issue umziehen, samt Kommentar. Alle Folge-Pull-
+Requests eines Umbaus zeigen auf den Befund — der muss an einer Stelle liegen, die offen
+bleibt, bis die Arbeit fertig ist.
+
+Für Bugs ist das bereits gelebte Praxis, siehe „Bugs untersuchen" gleich unten, Punkt
+„Reproduziert" — diese Regel verallgemeinert nur, was dort schon gilt.
 
 ## Bugs untersuchen
 
