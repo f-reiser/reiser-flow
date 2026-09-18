@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Prueft die Workflows dieses Repositories auf vier Zusagen, die sonst niemand
+"""Prueft die Workflows dieses Repositories auf fuenf Zusagen, die sonst niemand
 haelt - und die, wenn sie brechen, in FREMDEN Projekten wirken.
 
     1. Selbstbezug   Ein aufrufbarer Workflow bestimmt seinen eigenen Stand ueber
@@ -9,6 +9,7 @@ haelt - und die, wenn sie brechen, in FREMDEN Projekten wirken.
                      diesen Stand als Ref.
     3. Fremder Code  Ein Workflow an pull_request_target checkt keinen "ref:" aus.
     4. Projektfrei   Ein aufrufbarer Workflow nennt keine Projektspezifika.
+    5. Ausdruecke    Kein "${{ ... }}" im on:-Abschnitt.
 
 WARUM 1 UND 2 KEINE STILFRAGE SIND
     In einem per workflow_call aufgerufenen Workflow zeigen github.workflow_ref und
@@ -108,6 +109,22 @@ def setzt_ref(block):
     return re.search(r"^\s*ref\s*:", block, re.M) is not None
 
 
+def ausloeser_block(text):
+    """Der "on:"-Abschnitt - von "on:" bis zum naechsten Schluessel ganz links."""
+    zeilen = text.split(ZL)
+    anfang = None
+    for i, z in enumerate(zeilen):
+        if re.match(r"^on\s*:", z):
+            anfang = i
+            break
+    if anfang is None:
+        return 0, ""
+    for j in range(anfang + 1, len(zeilen)):
+        if zeilen[j].strip() and not zeilen[j][:1].isspace():
+            return anfang + 1, ZL.join(zeilen[anfang:j])
+    return anfang + 1, ZL.join(zeilen[anfang:])
+
+
 def befunde(name, roh):
     """Liste der Befunde zu einem Workflow - leer heisst gruen."""
     text = ohne_kommentare(roh)
@@ -117,6 +134,17 @@ def befunde(name, roh):
 
     def melde(zeile, was):
         gefunden.append("%s:%d: %s" % (name, zeile, was))
+
+    #  GitHub kennt in "on:" ueberhaupt keine Ausdruecke, wertet ein "${{ ... }}"
+    #  dort aber trotzdem aus - und weist die GANZE Datei zurueck, wenn es nicht
+    #  aufgeht. Der Lauf hat dann keine Jobs und meldet nur "workflow file issue",
+    #  ohne die Stelle zu nennen. Genau so ist es am 18.09.2026 passiert: In der
+    #  description eines workflow_call-Eingabewertes stand ein Beispiel mit
+    #  "needs.<job>.result", gemeint als Text.
+    zeile, aus = ausloeser_block(text)
+    if "${{" in aus:
+        melde(zeile, "Ausdruck ${{ ... }} im on:-Abschnitt - dort gibt es keine "
+                     "Ausdruecke, und GitHub weist die ganze Datei zurueck")
 
     for zeile, block in schritte(text):
         if aufrufbar:
@@ -286,8 +314,28 @@ def selbsttest():
                     + ZL + "        shell: bash" + ZL + "        #x: python3"),
                 False)
 
+    #  Mutation 5: ein Ausdruck im on:-Abschnitt. Genau der Fehler vom 18.09.2026,
+    #  als Beispiel in der description eines Eingabewertes.
+    pruefe_text("Mutation Ausdruck in der description", "muster.yml",
+                MUSTER.replace("        type: string",
+                               "        description: etwa ${{ needs.x.result }}"
+                               + ZL + "        type: string"), True)
+
+    #  Gegenprobe: derselbe Text als Kommentar oder weiter unten im Job ist
+    #  richtig und haeufig - "${{ job.workflow_sha }}" steht schon im Muster.
+    pruefe_text("Ausdruck unterhalb von on: ist erlaubt", "muster.yml",
+                MUSTER.replace("    inputs:",
+                               "    # Beispiel: ${{ needs.pruefung.result }}" + ZL
+                               + "    inputs:"), False)
+
+    #  Der Zerleger des on:-Abschnitts: Er darf nicht bis in den Job hineinreichen,
+    #  sonst meldete jedes "${{ }}" in irgendeinem Schritt einen Befund.
+    _, aus = ausloeser_block(MUSTER)
+    if "runs-on" in aus or "workflow_call" not in aus:
+        fehler.append("ausloeser_block(): falsch abgegrenzt (%r)" % aus[:80])
+
     gesamt = (2 + len(FALSCHER_SELBSTBEZUG) + 1 + 1 + len(PROJEKTWOERTER)
-              + 3 + 1 + 1 + 2 + 1)
+              + 3 + 1 + 1 + 2 + 1 + 2 + 1)
     for f in fehler:
         print("FEHLER: " + f)
     print("%d von %d Pruefungen bestanden." % (gesamt - len(fehler), gesamt))

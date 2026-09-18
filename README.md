@@ -122,7 +122,7 @@ das Plugin nicht mehr.
 `job.workflow_sha` und **nicht** `github.workflow_ref`: In einem per `workflow_call`
 aufgerufenen Workflow zeigt der `github`-Kontext auf den **Aufrufer**. Wer sich damit
 selbst nachlädt, holt den Stand, den der Aufrufer zufällig hat — die Anpinnung läuft ins
-Leere. `.github/pruefe_workflows.py` verhindert genau das, zusammen mit drei weiteren
+Leere. `.github/pruefe_workflows.py` verhindert genau das, zusammen mit vier weiteren
 Zusagen, die sonst erst in einem fremden Projekt auffielen.
 
 ### Nie über `@main`
