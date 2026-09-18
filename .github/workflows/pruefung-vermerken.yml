@@ -48,10 +48,14 @@ on:
   workflow_call:
     inputs:
       ergebnis:
+        #  Kein "${{ ... }}" in dieser Beschreibung, auch nicht als Beispiel:
+        #  GitHub wertet Ausdruecke hier aus, statt sie als Text zu nehmen, und
+        #  weist die ganze Datei zurueck, wenn einer nicht aufgeht. Das Beispiel
+        #  steht deshalb oben im Kommentar, wo es niemand auswertet.
         description: >
-          Ergebnis des Pruefjobs, ueblich "${{ needs.<job>.result }}" - also
-          success, failure, cancelled oder skipped. Alles ausser "success" gilt
-          als rot.
+          Ergebnis des Pruefjobs, ueblich das Feld "result" des Jobs aus "needs" -
+          also success, failure, cancelled oder skipped. Alles ausser "success"
+          gilt als rot.
         required: true
         type: string
 
