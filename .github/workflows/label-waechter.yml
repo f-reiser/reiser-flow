@@ -11,6 +11,14 @@ name: Label-Waechter
 #   jobs:
 #     label-waechter:
 #       uses: f-reiser/reiser-flow/.github/workflows/label-waechter.yml@<tag>
+#       permissions:            # MUSS der Aufrufer setzen
+#         issues: write
+#         pull-requests: write
+#
+# Ein aufgerufener Workflow kann Berechtigungen nur beibehalten oder senken, nie
+# erhoehen - was der Aufrufer nicht gibt, bekommt dieser Job auch dann nicht, wenn
+# er es unten anfordert. Fehlt eine, kann er das Label nicht zuruecknehmen: Er
+# meldet den Verstoss dann nur noch, statt ihn zu beheben.
 #
 # Einige Label sind Auftraege an die Automatik: "Einarbeiten" laesst den
 # Vier-Stunden-Lauf ein Issue umsetzen, "Untersuche" einen Bug nachstellen,

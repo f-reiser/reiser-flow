@@ -10,11 +10,28 @@ name: Claude-Aufgaben
 #   jobs:
 #     claude-aufgaben:
 #       uses: f-reiser/reiser-flow/.github/workflows/claude-aufgaben.yml@<tag>
+#       permissions:            # MUSS der Aufrufer setzen, siehe unten
+#         contents: write
+#         pull-requests: write
+#         issues: write
+#         id-token: write
+#         actions: read
 #       with:
 #         projektregeln: |
 #           <die zwei, drei Saetze, die NUR fuer dieses Projekt gelten>
 #       secrets:
 #         CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+#
+# WARUM DIE BERECHTIGUNGEN BEIM AUFRUFER STEHEN MUESSEN
+# Ein aufgerufener Workflow kann Berechtigungen nur beibehalten oder senken, nie
+# erhoehen - was der Aufrufer nicht gibt, bekommt dieser Job auch dann nicht, wenn
+# er es unten anfordert. Die Liste steht deshalb zweimal, und das ist kein
+# Versehen: Dieselbe Liste unten schraenkt ein, falls der Aufrufer mehr gibt.
+#
+# Fehlt eine, faellt es unterschiedlich schnell auf. "actions: read" ist die
+# unangenehmste: Ohne sie laeuft alles, bis das Modell nach dem Push die CI
+# abwarten will - dann antwortet die Actions-API mit 403, und der Lauf hat
+# gearbeitet und gekostet, kann sein Ergebnis aber nicht pruefen.
 #
 # Der Name nennt bewusst nicht ein einzelnes Label: "Einarbeiten" war einmal das
 # einzige, inzwischen sind es mehrere. Laeuft auf GitHub-Runnern und damit
