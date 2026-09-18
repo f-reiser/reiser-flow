@@ -1,0 +1,109 @@
+name: Pruefergebnis im Vorgang vermerken
+
+# Wiederverwendbarer Workflow (workflow_call). Er haengt das Ergebnis der
+# Projektpruefung an den Fortschrittskommentar des Vorgangs, zu dem der Branch
+# gehoert. Ein Projekt bindet ihn hinter seine eigene Pruefung:
+#
+#   jobs:
+#     pruefung:
+#       ...   # was dieses Projekt prueft
+#     vermerken:
+#       needs: pruefung
+#       if: always()
+#       uses: f-reiser/reiser-flow/.github/workflows/pruefung-vermerken.yml@<tag>
+#       with:
+#         ergebnis: ${{ needs.pruefung.result }}
+#
+# WOFUER DAS GUT IST
+# Ein Lauf, der eine angefangene Arbeit aufnimmt, muss als Erstes wissen: Stand
+# der Branch zuletzt gruen? Diese Antwort lag einmal nur im Actions-Verlauf - er
+# muesste sie sich zusammensuchen, und dafuer bezahlt jemand Modellzeit. Jetzt
+# steht sie im Fortschrittskommentar des Vorgangs, also in genau dem Text, den der
+# Prompt ihn zuerst lesen heisst.
+#
+# Nur auf Branches nach dem Schema issue-<nr>-*: Nur dort gibt es einen Vorgang,
+# zu dem das Ergebnis gehoert. Und nur ANHAENGEN, nie anlegen - sonst entstuende
+# der Kommentar auch an Vorgaengen, an denen gar kein unbeaufsichtigter Lauf
+# arbeitet.
+#
+# WAS DAS FUER BRANCHNAMEN BEDEUTET
+# Ein Branch, der mit "issue-<zahl>-" beginnt, schreibt in das Issue dieser
+# Nummer - IM PROJEKT, nicht dort, wo das Issue fachlich liegt. Wer an einem
+# Vorgang eines anderen Repositories arbeitet, nimmt deshalb einen Branchnamen
+# ohne dieses Praefix, sonst kommentiert die Pruefung ein fremdes, zufaellig
+# gleichnummeriertes Issue.
+
+on:
+  workflow_call:
+    inputs:
+      ergebnis:
+        description: >
+          Ergebnis des Pruefjobs, ueblich "${{ needs.<job>.result }}" - also
+          success, failure, cancelled oder skipped. Alles ausser "success" gilt
+          als rot.
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: read
+
+jobs:
+  vermerken:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    #  Der Aufrufer ruft mit "if: always()" auf, damit gerade das rote Ergebnis
+    #  ankommt. Die Einschraenkung auf Vorgangs-Branches gehoert hierher, nicht
+    #  zum Aufrufer - sie ist Teil der Regel, nicht des Projekts.
+    if: startsWith(github.head_ref || github.ref_name, 'issue-')
+    steps:
+      #  Nur fortschritt.py, und aus genau dem Commit, aus dem auch diese Datei
+      #  stammt (job.workflow_sha - im github-Kontext stuende der AUFRUFER, siehe
+      #  .github/pruefe_workflows.py).
+      - uses: actions/checkout@v7
+        with:
+          repository: f-reiser/reiser-flow
+          ref: ${{ job.workflow_sha }}
+          path: _reiser-flow
+          sparse-checkout: .github/skripte
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Ergebnis an den Fortschrittskommentar anhaengen
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ERGEBNIS: ${{ inputs.ergebnis }}
+          #  head_ref ist bei pull_request der Quellbranch; ref_name waere
+          #  dort '<nr>/merge'. Bei push ist head_ref leer.
+          BRANCH: ${{ github.head_ref || github.ref_name }}
+        run: |
+          REST=${BRANCH#issue-}
+          NR=${REST%%-*}
+          case $NR in
+            ''|*[!0-9]*)
+              echo 'Branchname ohne Vorgangsnummer - nichts zu vermerken.'
+              exit 0 ;;
+          esac
+
+          #  Auf einem Branch mit Pull Request laeuft die Pruefung zweimal, einmal
+          #  je Ereignis. Ohne diese Schranke stuenden zwei gleiche Zeilen im
+          #  Kommentar. Der push-Lauf tritt zurueck; der pull_request-Lauf
+          #  berichtet, denn den gibt es auch dann, wenn der Push selbst keinen
+          #  Lauf ausgeloest hat.
+          if [ "$GITHUB_EVENT_NAME" = push ] \
+             && [ -n "$(gh pr list -R "$GITHUB_REPOSITORY" --head "$BRANCH" --state open --json number --jq '.[].number')" ]; then
+            echo 'Es gibt einen offenen Pull Request - der pull_request-Lauf vermerkt.'
+            exit 0
+          fi
+          if [ "$ERGEBNIS" = success ]; then
+            STAND='**gruen**'
+          else
+            STAND='**ROT** - hier weitermachen, bevor irgendetwas anderes kommt'
+          fi
+          LAUF=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
+          python3 "$GITHUB_WORKSPACE/_reiser-flow/.github/skripte/fortschritt.py" \
+            vermerk "$NR" \
+            "Pruefung $STAND fuer \`${GITHUB_SHA:0:7}\` auf \`$BRANCH\` ([Lauf]($LAUF))."

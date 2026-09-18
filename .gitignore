@@ -1,0 +1,28 @@
+# Whitelist statt Blacklist: erst alles ignorieren, dann gezielt zulassen.
+# Begruendung im Skill repo-hygiene - ein Versehen faellt so in die harmlose
+# Richtung. Der Preis ist die Nachfragepflicht: Was neu dazukommt und hier nicht
+# steht, faellt still durch und muss eingetragen werden.
+#
+# Bis zum 18.09.2026 gab es hier gar keine .gitignore. Das ging, solange das
+# Repository nur Prosa enthielt. Seit die gemeinsamen Workflows und ihre
+# Python-Skripte hier liegen, erzeugt jeder lokale Lauf __pycache__.
+
+*
+
+# Verzeichnisse muessen durchlaufbar bleiben, sonst greift keine der Ausnahmen
+# darunter - Git steigt in ein ignoriertes Verzeichnis gar nicht erst hinab.
+!*/
+
+# --- Was hinein soll -------------------------------------------------
+!.gitignore
+!.gitattributes
+!LICENSE
+!README.md
+!.claude-plugin/**
+!plugins/**
+!.github/**
+
+# --- Ausnahmen von den Ausnahmen -------------------------------------
+# Muessen NACH den Freigaben stehen: die letzte passende Regel gewinnt.
+**/__pycache__/
+*.pyc

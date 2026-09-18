@@ -1,10 +1,16 @@
 name: Pruefung
 
-# Bis jetzt hatte dieses Repository keine Pruefung - es enthielt nur Prosa, und die
-# einzige Zusage, die ein Werkzeug halten konnte, hielt "claude plugin tag" beim Release.
-# Mit dem zweiten Plugin gilt das nicht mehr: Der Gleichlauf der Versionen ZWISCHEN den
-# Plugins ist eine Zusage, die "claude plugin tag" strukturell nicht pruefen kann, weil
-# es je Aufruf nur ein Plugin sieht.
+# Einmal enthielt dieses Repository nur Prosa, und die einzige Zusage, die ein Werkzeug
+# halten konnte, hielt "claude plugin tag" beim Release. Mit dem zweiten Plugin galt das
+# nicht mehr: Der Gleichlauf der Versionen ZWISCHEN den Plugins ist eine Zusage, die
+# "claude plugin tag" strukturell nicht pruefen kann, weil es je Aufruf nur ein Plugin
+# sieht.
+#
+# Seit die gemeinsamen Workflows hier liegen, wiegt jeder Fehler mehr: Er faellt nicht
+# in diesem Repository auf, sondern in einem fremden Projekt, das sich einen Tag von hier
+# holt. Deshalb laufen die Selbsttests ALLER Skripte hier - und nicht bei den Projekten,
+# die sie einbinden. Die haben nichts davon, die Unit-Tests einer fremden Bibliothek bei
+# jedem Push mitlaufen zu lassen; geprueft gehoert das, wo es geaendert wird.
 
 on:
   push:
@@ -30,5 +36,53 @@ jobs:
       - name: Selbsttest der Pruefung
         run: python .github/pruefe_marketplace.py --selbsttest
 
+      #  Die Workflows selbst. Sie laufen in FREMDEN Projekten - ein Fehler hier faellt
+      #  sonst dort auf, und zwar dem, der ihn nicht verursacht hat.
+      - name: Workflows
+        run: python .github/pruefe_workflows.py
+
+      - name: Selbsttest der Workflow-Pruefung
+        run: python .github/pruefe_workflows.py --selbsttest
+
       - name: Selbsttest des Issue-Autoclose-Workflows
         run: python .github/skripte/issue_autoclose.py --selbsttest
+
+      #  Die Zuordnung entscheidet, an welchem Vorgang der naechste unbeaufsichtigte
+      #  Lauf weiterarbeitet. Ein Fehler darin faellt sonst erst auf, wenn ein
+      #  abgebrochener Vorgang doppelt angefangen wird.
+      - name: Zuordnung Vorgang zu Branch
+        run: python .github/skripte/zuordnung.py --selbsttest
+
+      #  Ein Fehler hier wirkt sich auf Modellwahl UND Label-Schutz aus, faellt aber nur
+      #  an einer der beiden Stellen auf.
+      - name: Scoped Labels erkennen
+        run: python .github/skripte/scoped_labels.py --selbsttest
+
+      #  Modell und Aufwand entscheiden, was ein Lauf kostet. Ein Fehler in der Zuordnung
+      #  von Label zu Modell faellt sonst erst an der Rechnung auf.
+      - name: Modellwahl aus den Labels
+        run: python .github/skripte/modellwahl.py --selbsttest
+
+      #  Entscheidet, wer die Steuerlabel setzen darf. Ein Fehler hier faellt sonst erst
+      #  auf, wenn jemand mit zu wenig oder zu viel Recht ein Label setzt - siehe
+      #  label-waechter.yml.
+      - name: Berechtigung fuer die Steuerlabel
+        run: python .github/skripte/berechtigt.py --selbsttest
+
+      #  Welche Label ueberhaupt geschuetzt sind. Ein Fehler hier faellt sonst erst auf,
+      #  wenn ein scoped Label ungeschuetzt bleibt oder ein fremdes Label faelschlich
+      #  zurueckgenommen wird.
+      - name: Welche Label geschuetzt sind
+        run: python .github/skripte/geschuetzt.py --selbsttest
+
+      #  Bricht das Blockzitat des Fortschrittskommentars auf, steht die Haelfte des
+      #  Standes als Fliesstext im Vorgang - und findet die Marke ihn nicht wieder, legt
+      #  jeder Lauf einen neuen an.
+      - name: Fortschrittskommentar
+        run: python .github/skripte/fortschritt.py --selbsttest
+
+      #  Liest eine Datei, deren Aufbau nicht zugesagt ist. Findet es etwas nicht, MUSS
+      #  dort 'nicht ermittelbar' stehen - eine erfundene Zahl waere schlimmer als gar
+      #  keine.
+      - name: Abschlusskommentar
+        run: python .github/skripte/abschluss.py --selbsttest

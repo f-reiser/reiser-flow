@@ -1,0 +1,140 @@
+name: Label-Waechter
+
+# Wiederverwendbarer Workflow (workflow_call). Ein Projekt bindet ihn an seine
+# eigenen Label-Ereignisse:
+#
+#   on:
+#     issues:
+#       types: [labeled]
+#     pull_request_target:
+#       types: [labeled]
+#   jobs:
+#     label-waechter:
+#       uses: f-reiser/reiser-flow/.github/workflows/label-waechter.yml@<tag>
+#
+# Einige Label sind Auftraege an die Automatik: "Einarbeiten" laesst den
+# Vier-Stunden-Lauf ein Issue umsetzen, "Untersuche" einen Bug nachstellen,
+# "Gegenlese" verlangt danach zusaetzlich eine fremde Gegenlese. Dazu kommen die
+# Steuerlabel fuer Modell, Version und Aufwand als scoped Labels nach dem Vorbild
+# von GitLab ("Modell::Opus", "v::5", "Aufwand::hoch" - siehe
+# .github/skripte/geschuetzt.py). Sie entscheiden, was ein Lauf kostet. Wer sie
+# vergeben darf, stand einmal nur als Konvention in den Skills - und eine
+# Konvention haelt niemanden auf.
+#
+# Wer sie technisch setzen KANN, ist nicht die Oeffentlichkeit: Label vergeben
+# setzt mindestens Triage-Recht voraus, ein oeffentliches Repository gibt Fremden
+# nur Lesezugriff. Es sind die eigenen Schreibberechtigten - das Bot-Konto und
+# jeder Workflow-Token mit "issues: write". Genau davor schuetzt diese Datei.
+#
+# Sie nimmt nur zurueck, sie setzt nie. Ein Entfernen loest "unlabeled" aus,
+# worauf hier nichts horcht - eine Schleife ist damit ausgeschlossen.
+#
+# GEPRUEFT WIRD DIE BERECHTIGUNG, NICHT DER NAME
+# Frueher stand hier ein Kontoname. Das war doppelt schlecht: Es band eine
+# projektunabhaengige Regel an eine Person, und es machte die Datei unbrauchbar
+# fuer jedes andere Repository. Jetzt fragt sie GitHub nach der Rolle (Admin oder
+# Maintainer) - dieselbe Datei passt damit ueberall hin, und deshalb steht sie
+# hier statt in jedem Projekt einzeln.
+#
+# WARUM DER AUFRUFER pull_request_target BRAUCHT
+# Bei einem Pull Request aus einem Fork bekaeme "pull_request" nur einen
+# Lesetoken und koennte das Label nicht wieder abnehmen. Der Aufrufer darf im
+# Gegenzug KEINEN "ref:" auf den Kopf des Pull Request auschecken - sonst laeuft
+# fremder Fork-Code auf einem Runner mit Schreibrechten. Dieser Workflow checkt
+# das Projekt gar nicht erst aus; er braucht nur die Skripte von hier.
+
+on:
+  workflow_call:
+
+permissions:
+  issues: write
+  pull-requests: write
+
+jobs:
+  zuruecknehmen:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    #  Am Job, nicht am Workflow: Ein aufgerufener Workflow laeuft im Lauf seines
+    #  Aufrufers. Truege der Aufrufer dieselbe Gruppe, wartete dieser Job auf den
+    #  Lauf, zu dem er selbst gehoert. Der Aufrufer setzt deshalb keine.
+    #
+    #  Zwei fast gleichzeitige "labeled"-Events auf demselben Vorgang (etwa ein
+    #  Mehrfachauswahl-Klick im Label-Picker) sollen nacheinander laufen, nicht
+    #  parallel - siehe die Begruendung in scope_ausschluss.py.
+    concurrency:
+      group: label-waechter-${{ github.repository }}-${{ github.event.issue.number || github.event.pull_request.number }}
+
+    steps:
+      #  Nur die Skripte, und nur aus genau dem Commit, aus dem auch diese Datei
+      #  stammt (job.workflow_sha - im github-Kontext stuende der AUFRUFER, siehe
+      #  .github/pruefe_workflows.py). Das Projekt selbst wird nicht ausgecheckt:
+      #  Diese Datei arbeitet ausschliesslich ueber die API.
+      - uses: actions/checkout@v7
+        with:
+          repository: f-reiser/reiser-flow
+          ref: ${{ job.workflow_sha }}
+          path: _reiser-flow
+          sparse-checkout: .github/skripte
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      #  Was geschuetzt ist, steht nur in .github/skripte/geschuetzt.py - dort auch
+      #  begruendet, warum "GegenleseBefund" trotz Namensnaehe NICHT dazugehoert.
+      - name: Label zuruecknehmen, wenn es nicht von Admin oder Maintainer kam
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          #  Ein Pull Request ist in der Issues-API dasselbe Objekt wie ein
+          #  Issue, deshalb traegt derselbe Pfad beide Faelle.
+          NR: ${{ github.event.issue.number || github.event.pull_request.number }}
+          LABEL: ${{ github.event.label.name }}
+          WER: ${{ github.event.sender.login }}
+        run: |
+          S="$GITHUB_WORKSPACE/_reiser-flow/.github/skripte"
+
+          if ! python3 "$S/geschuetzt.py" "$LABEL"; then
+            echo "$LABEL ist nicht geschuetzt - nichts zu tun."
+            exit 0
+          fi
+
+          #  404 heisst: kein Collaborator (etwa "github-actions[bot]"). Das ist
+          #  kein Fehler, sondern die Antwort "keine Berechtigung" - deshalb auf
+          #  leer zurueckfallen statt abzubrechen.
+          RECHT=$(gh api "repos/$REPO/collaborators/$WER/permission" \
+                    --jq .permission 2>/dev/null || true)
+          echo "$WER hat Recht: ${RECHT:-keines}"
+
+          #  Admin ODER Maintainer duerfen die Steuerlabel setzen, Write nicht -
+          #  siehe berechtigt.py fuer die Begruendung und den Selbsttest.
+          if python3 "$S/berechtigt.py" "$RECHT"; then
+            echo "Berechtigt - Label bleibt."
+            exit 0
+          fi
+
+          gh api --method DELETE "repos/$REPO/issues/$NR/labels/$LABEL"
+
+          #  Format einfach gequotet: Der Text enthaelt Backticks, und in
+          #  doppelten Anfuehrungszeichen wuerde die Shell daraus
+          #  Kommandosubstitution machen.
+          printf 'Das Label `%s` wurde von `%s` gesetzt und automatisch wieder entfernt.\n\n`%s` steuert die Automatik und darf ausschliesslich von einem Konto mit Admin- oder Maintainer-Recht auf diesem Repository vergeben werden. Durchgesetzt wird das vom Label-Waechter aus `f-reiser/reiser-flow`.\n\nIst der Auftrag berechtigt, setzt ihn der Nutzer selbst.\n' \
+            "$LABEL" "$WER" "$LABEL" > "$RUNNER_TEMP/kommentar.md"
+
+          gh api --method POST "repos/$REPO/issues/$NR/comments" \
+            -F "body=@$RUNNER_TEMP/kommentar.md"
+          echo "::warning::$LABEL von $WER gesetzt und zurueckgenommen (#$NR)"
+
+      #  Scoped Labels nach GitLab-Vorbild (konventionen.md): pro Scope
+      #  gleichzeitig hoechstens ein Wert. Laeuft nach der Berechtigungspruefung
+      #  oben und unabhaengig von ihrem Ausgang - scope_ausschluss.py holt den
+      #  Label-Stand selbst frisch und prueft selbst, ob es noch etwas zu tun
+      #  gibt (siehe Begruendung dort).
+      - name: Geschwister-Label im selben Scope entfernen
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          NR: ${{ github.event.issue.number || github.event.pull_request.number }}
+          LABEL: ${{ github.event.label.name }}
+        run: python3 "$GITHUB_WORKSPACE/_reiser-flow/.github/skripte/scope_ausschluss.py"
