@@ -43,9 +43,13 @@ abgeschrieben. Eine zweite gepflegte Fassung läuft auseinander — die Frage is
 
 **Wenn das Format zwei Fassungen erzwingt**, wie bei einem Claude-Plugin
 (`.claude-plugin/marketplace.json` und `plugins/<name>/.claude-plugin/plugin.json`), gilt
-die Ausnahme nur mit einer **Prüfung, die den Gleichlauf erzwingt** — hier
+die Ausnahme nur mit einer **Prüfung, die den Gleichlauf erzwingt** — etwa
 `claude plugin tag`, das das Release verweigert, wenn beide auseinanderliegen. Ohne
 solche Prüfung ist die zweite Fassung kein Sonderfall, sondern der Fehler.
+
+Besser als beim Release prüft man das **bei jedem Push**: `claude plugin tag` schlägt an
+der teuersten Stelle an, nämlich dann, wenn schon alles fertig ist. Und es sieht je Aufruf
+nur ein Plugin — was über mehrere hinweg gelten soll, hält es strukturell nicht.
 
 Führe außerdem im Kopf, **wer die Nummer sonst noch liest**. Holt sich irgendwo ein
 fremder Workflow etwas aus dem Projekt über einen Tag, hängt er an genau dieser Nummer;
@@ -194,6 +198,12 @@ Marketplace —, trägt der Tag den Namen der Einheit voran: `<name>--v<version>
 `reiser-flow--v0.3.0`. Sonst kollidieren zwei Einheiten beim ersten Mal, an dem sie
 dieselbe Nummer erreichen.
 
+Das Wort, auf das es ankommt, ist **getrennt**. Mehrere Dinge in einem Repository, die
+immer **dieselbe Nummer tragen und zusammen veröffentlicht** werden, sind eine Einheit und
+bekommen einen Tag — nicht drei gleichnummerierte, zwischen denen niemand wählen kann.
+Woran man das erkennt: Hängt eines vom Stand des anderen ab, oder lädt eines das andere
+nach, dann gibt es keinen Zeitpunkt, an dem verschiedene Nummern einen Sinn ergäben.
+
 Welches Schema ein Repository verwendet, ist nichts, was man raten darf: `git tag --list`
 zeigt es, und ein Workflow, der einen Tag als `ref:` festnagelt, zeigt es auch.
 
@@ -203,7 +213,16 @@ ein Zeiger und sagt später nichts darüber, wer wann was veröffentlicht hat.
 
 **Bei einem Claude-Plugin tritt `claude plugin tag` an die Stelle von `git tag -a`** (es
 prüft zusätzlich den Gleichlauf zwischen `plugin.json` und der Marketplace-Datei, siehe
-oben). Der Befehl nimmt aber keine Identität als Parameter entgegen wie `git commit
+oben).
+
+> **Nicht**, wenn das Repository die Plugins zusammen mit anderem unter **einem** Tag
+> veröffentlicht: `claude plugin tag` sieht je Aufruf nur ein Plugin und benennt den Tag
+> danach, erzeugt also genau die getrennten Tags, die es dann nicht geben soll. Dort ist
+> `git tag -a v<version>` richtig — **aber nur, wenn eine Prüfung im Repository den
+> Gleichlauf der Versionsangaben bei jedem Push erzwingt.** Sonst gibt man die einzige
+> Zusage auf, die `claude plugin tag` gehalten hat, und tauscht sie gegen nichts ein.
+
+Der Befehl nimmt keine Identität als Parameter entgegen wie `git commit
 -c user.name=…` — er tagt unter der aktuellen globalen Git-Identität. Für ein Release
 unter dem Bot-Konto (`git-branch-strategie` → „Mit welchem Konto") deshalb kurz davor
 repo-lokal umstellen und danach wieder entfernen, damit sonstige Arbeit in diesem Klon
