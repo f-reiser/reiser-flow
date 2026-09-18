@@ -1,0 +1,285 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""Prueft die Workflows dieses Repositories auf vier Zusagen, die sonst niemand
+haelt - und die, wenn sie brechen, in FREMDEN Projekten wirken.
+
+    1. Selbstbezug   Ein aufrufbarer Workflow bestimmt seinen eigenen Stand ueber
+                     job.workflow_sha, nie ueber github.workflow_ref/-_sha.
+    2. Verriegelung  Jeder Selbst-Checkout von f-reiser/reiser-flow nennt genau
+                     diesen Stand als Ref.
+    3. Fremder Code  Ein Workflow an pull_request_target checkt keinen "ref:" aus.
+    4. Projektfrei   Ein aufrufbarer Workflow nennt keine Projektspezifika.
+
+WARUM 1 UND 2 KEINE STILFRAGE SIND
+    In einem per workflow_call aufgerufenen Workflow zeigen github.workflow_ref und
+    github.workflow_sha auf den AUFRUFER, nicht auf die aufgerufene Datei - belegt in
+    der Kontext-Dokumentation von GitHub und an einem Debug-Mitschnitt in
+    github/gh-aw#24918. Ein Workflow, der sich damit selbst nachlaedt, holt also den
+    Stand, den der Aufrufer zufaellig hat: bei einem Projekt auf main den main-Stand
+    dieses Repositories - die Anpinnung des Aufrufers laeuft ins Leere. Steht der
+    Aufrufer auf einem Feature-Branch, gibt es den Ref hier gar nicht und der
+    Checkout scheitert.
+
+    Richtig ist job.workflow_sha - "the commit SHA of the workflow file that defines
+    the current job". Damit stammen Workflow, Skripte und Skills aus EINEM Commit,
+    genau der Vertrag, den f-reiser/reiser-flow#1 begruendet.
+
+WARUM 3 HIER STEHT
+    pull_request_target laeuft mit Schreibtoken. Ein "ref:" auf den Kopf des Pull
+    Request holte damit fremden Fork-Code auf einen Runner, der schreiben darf.
+    Bisher war das nur eine Zeile Prosa in einer Checkliste (Abschnitt A in
+    f-reiser/reiser-flow#12) - Prosa haelt niemanden auf.
+
+Aufruf ohne Argument prueft dieses Repository, mit --selbsttest die Pruefung selbst.
+"""
+import io
+import os
+import re
+import sys
+
+WURZEL = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+WORKFLOWS = ".github/workflows"
+
+#  Der Aufrufer-Kontext, der in einem aufrufbaren Workflow das Falsche liefert.
+FALSCHER_SELBSTBEZUG = ("github.workflow_ref", "github.workflow_sha",
+                        "GITHUB_WORKFLOW_REF", "GITHUB_WORKFLOW_SHA")
+RICHTIGER_SELBSTBEZUG = "job.workflow_sha"
+
+DIESES_REPOSITORY = "f-reiser/reiser-flow"
+
+#  Woerter, die ein aufrufbarer Workflow nicht kennen darf. Sie stammen aus dem
+#  Projekt, aus dem diese Workflows gekommen sind - taucht eines auf, ist beim
+#  Herausloesen etwas liegengeblieben.
+PROJEKTWOERTER = ("Makros", ".bas", ".xlsm", "openpyxl", "cp1252",
+                  "Stoffverteilungsplan", "pruefe_alles")
+
+#  Eine Zeile, die einen Schritt beginnt.
+SCHRITT_BEGINN = re.compile(r"^\s*-\s+(uses|name|id|run|if)\s*:")
+
+ZL = chr(10)
+
+
+def ohne_kommentare(text):
+    """Ganze Kommentarzeilen fallen weg - ersetzt durch Leerzeilen, damit die
+    Zeilennummer eines Befundes weiter stimmt.
+
+    Bewusst NICHT der Text hinter einem "#" mitten in der Zeile: In einem "run:"-Block
+    ist das Shell-Code, kein Kommentar. Und die Richtung stimmt - diese Datei soll
+    lieber einen Befund zu viel melden als einen zu wenig.
+    """
+    return ZL.join("" if z.lstrip().startswith("#") else z
+                   for z in text.split(ZL))
+
+
+def ist_aufrufbar(text):
+    return re.search(r"^\s*workflow_call\s*:", text, re.M) is not None
+
+
+def hoert_auf_fork_ereignis(text):
+    return re.search(r"^\s*pull_request_target\s*:", text, re.M) is not None
+
+
+def schritte(text):
+    """Der Text, in Schritte zerlegt - je Schritt (erste Zeilennummer, Text).
+
+    Der Kopf des Workflows vor dem ersten Schritt kommt als eigener Block mit heraus,
+    damit keine Zeile ungeprueft bleibt.
+    """
+    zeilen = text.split(ZL)
+    grenzen = [i for i, z in enumerate(zeilen) if SCHRITT_BEGINN.match(z)]
+    if not grenzen or grenzen[0] != 0:
+        grenzen = [0] + grenzen
+    bloecke = []
+    for k, anfang in enumerate(grenzen):
+        ende = grenzen[k + 1] if k + 1 < len(grenzen) else len(zeilen)
+        bloecke.append((anfang + 1, ZL.join(zeilen[anfang:ende])))
+    return bloecke
+
+
+def setzt_ref(block):
+    return re.search(r"^\s*ref\s*:", block, re.M) is not None
+
+
+def befunde(name, roh):
+    """Liste der Befunde zu einem Workflow - leer heisst gruen."""
+    text = ohne_kommentare(roh)
+    aufrufbar = ist_aufrufbar(text)
+    fork = hoert_auf_fork_ereignis(text)
+    gefunden = []
+
+    def melde(zeile, was):
+        gefunden.append("%s:%d: %s" % (name, zeile, was))
+
+    for zeile, block in schritte(text):
+        if aufrufbar:
+            for falsch in FALSCHER_SELBSTBEZUG:
+                if falsch in block:
+                    melde(zeile, "%s zeigt in einem aufrufbaren Workflow auf den "
+                                 "AUFRUFER - %s verwenden"
+                          % (falsch, RICHTIGER_SELBSTBEZUG))
+
+            if DIESES_REPOSITORY in block and RICHTIGER_SELBSTBEZUG not in block:
+                melde(zeile, "Selbstbezug auf %s ohne %s - der Stand ist nicht "
+                             "verriegelt" % (DIESES_REPOSITORY, RICHTIGER_SELBSTBEZUG))
+
+            for wort in PROJEKTWOERTER:
+                if wort in block:
+                    melde(zeile, "projektspezifisch: %r gehoert nicht in einen "
+                                 "aufrufbaren Workflow" % wort)
+
+        if fork and "actions/checkout" in block and setzt_ref(block):
+            melde(zeile, "actions/checkout mit 'ref:' in einem Workflow an "
+                         "pull_request_target - fremder Fork-Code auf einem Runner "
+                         "mit Schreibtoken")
+
+    return gefunden
+
+
+def pruefe(wurzel=WURZEL):
+    ordner = os.path.join(wurzel, ".github", "workflows")
+    if not os.path.isdir(ordner):
+        return ["%s gibt es nicht" % WORKFLOWS]
+    dateien = sorted(d for d in os.listdir(ordner)
+                     if d.endswith(".yml") or d.endswith(".yaml"))
+    if not dateien:
+        return ["keine Workflows in %s" % WORKFLOWS]
+    alle = []
+    for d in dateien:
+        with io.open(os.path.join(ordner, d), encoding="utf-8") as f:
+            alle.extend(befunde(WORKFLOWS + "/" + d, f.read()))
+    return alle
+
+
+#  ----------------------------------------------------------------- Selbsttest
+
+#  Ein aufrufbarer Workflow, wie er sein soll. Die Mutationen unten aendern je eine
+#  Stelle daran - schlaegt danach keine Pruefung an, prueft sie nichts.
+MUSTER = """name: Muster
+on:
+  workflow_call:
+    inputs:
+      wert:
+        type: string
+jobs:
+  tun:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          repository: f-reiser/reiser-flow
+          ref: ${{ job.workflow_sha }}
+          path: _reiser-flow
+      - name: Etwas tun
+        run: python3 _reiser-flow/.github/skripte/etwas.py
+"""
+
+FORK_MUSTER = """name: Fork
+on:
+  pull_request_target:
+    types: [labeled]
+jobs:
+  tun:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Etwas tun
+        run: echo hallo
+"""
+
+
+def selbsttest():
+    fehler = []
+
+    def pruefe_text(was, name, text, erwartet_treffer):
+        b = befunde(name, text)
+        if bool(b) != erwartet_treffer:
+            fehler.append("%s: %d Befunde, erwartet waren %s (%s)"
+                          % (was, len(b), "welche" if erwartet_treffer else "keine",
+                             "; ".join(b) or "-"))
+
+    #  Gruen: die unveraenderten Muster.
+    pruefe_text("Muster unveraendert", "muster.yml", MUSTER, False)
+    pruefe_text("Fork-Muster unveraendert", "fork.yml", FORK_MUSTER, False)
+
+    #  Mutation 1: Selbstbezug ueber den Aufrufer-Kontext.
+    for falsch in FALSCHER_SELBSTBEZUG:
+        pruefe_text("Mutation Selbstbezug %s" % falsch, "muster.yml",
+                    MUSTER.replace("job.workflow_sha", falsch), True)
+
+    #  Mutation 2: Selbst-Checkout ohne jede Verriegelung.
+    pruefe_text("Mutation Ref entfernt", "muster.yml",
+                MUSTER.replace("          ref: ${{ job.workflow_sha }}" + ZL, ""),
+                True)
+
+    #  Mutation 3: fremder Fork-Code auf einen schreibenden Runner.
+    pruefe_text("Mutation ref bei pull_request_target", "fork.yml",
+                FORK_MUSTER.replace(
+                    "      - uses: actions/checkout@v7",
+                    "      - uses: actions/checkout@v7" + ZL
+                    + "        with:" + ZL
+                    + "          ref: ${{ github.event.pull_request.head.sha }}"),
+                True)
+
+    #  Mutation 4: je ein Projektwort, einzeln.
+    for wort in PROJEKTWOERTER:
+        pruefe_text("Mutation Projektwort %r" % wort, "muster.yml",
+                    MUSTER.replace("run: python3", "run: %s python3" % wort), True)
+
+    #  Gegenprobe zu 1/2/4: In einem NICHT aufrufbaren Workflow ist all das erlaubt -
+    #  dort meint github.workflow_ref die Datei selbst, und die eigene CI darf ihr
+    #  eigenes Projekt beim Namen nennen.
+    eigener = MUSTER.replace("  workflow_call:" + ZL
+                             + "    inputs:" + ZL
+                             + "      wert:" + ZL
+                             + "        type: string", "  push:")
+    pruefe_text("nicht aufrufbar: Selbstbezug erlaubt", "eigen.yml",
+                eigener.replace("job.workflow_sha", "github.workflow_sha"), False)
+    pruefe_text("nicht aufrufbar: Projektwort erlaubt", "eigen.yml",
+                eigener.replace("run: python3", "run: Makros python3"), False)
+
+    #  Gegenprobe zu 3: ein "ref:" ist nur an pull_request_target gefaehrlich.
+    pruefe_text("ohne pull_request_target: ref erlaubt", "eigen.yml",
+                eigener.replace("          path: _reiser-flow",
+                                "          path: _reiser-flow" + ZL
+                                + "          ref: irgendwas"), False)
+
+    #  Ein Kommentar, der die falsche Schreibweise ERKLAERT, darf nicht anschlagen -
+    #  sonst laesst sich der Grund nicht mehr aufschreiben.
+    pruefe_text("Kommentar mit der falschen Schreibweise", "muster.yml",
+                MUSTER.replace(
+                    "      - name: Etwas tun",
+                    "      #  github.workflow_ref waere hier der Aufrufer." + ZL
+                    + "      - name: Etwas tun"), False)
+
+    #  Der Zerleger selbst. Ohne diese Pruefung koennte ein Ref aus Schritt A einen
+    #  Schritt B verriegeln, der gar nicht verriegelt ist.
+    anzahl = len(schritte(MUSTER))
+    if anzahl != 3:
+        fehler.append("schritte(): %d Bloecke statt 3 (Kopf + zwei Schritte)" % anzahl)
+
+    #  Genau dieser Fall: Schritt A ist verriegelt, ein ZWEITER Selbstbezug nicht.
+    pruefe_text("zweiter Selbstbezug ohne Verriegelung", "muster.yml",
+                MUSTER + ("      - name: Nochmal holen" + ZL
+                          + "        run: git clone "
+                            "https://github.com/f-reiser/reiser-flow.git" + ZL), True)
+
+    gesamt = 2 + len(FALSCHER_SELBSTBEZUG) + 1 + 1 + len(PROJEKTWOERTER) + 3 + 1 + 1 + 1
+    for f in fehler:
+        print("FEHLER: " + f)
+    print("%d von %d Pruefungen bestanden." % (gesamt - len(fehler), gesamt))
+    return 1 if fehler else 0
+
+
+def main():
+    gefunden = pruefe()
+    for f in gefunden:
+        print("FEHLER: " + f)
+    if gefunden:
+        print("%d Befund(e)." % len(gefunden))
+        return 1
+    print("Workflows in Ordnung.")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(selbsttest() if "--selbsttest" in sys.argv else main())
