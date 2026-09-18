@@ -1,0 +1,68 @@
+name: Issue automatisch schliessen
+
+# Wiederverwendbarer Workflow (workflow_call). Ein Projekt bindet ihn per Zeitplan ein
+# und nennt das Konto, dessen Merge als "Issue abgearbeitet" zaehlt:
+#
+#   on:
+#     schedule: [{ cron: "*/10 * * * *" }]
+#     workflow_dispatch:
+#   jobs:
+#     issue-autoclose:
+#       uses: f-reiser/reiser-flow/.github/workflows/issue-autoclose.yml@<tag>
+#       with:
+#         maintainer-login: ${{ vars.MAINTAINER_LOGIN }}
+#
+# Erkennung ueber den Branchnamen (issue-<nr>-<slug>, siehe git-branch-strategie), nicht
+# ueber GitHub-Cross-References - Details und Begruendung in .github/skripte/issue_autoclose.py.
+# Ein geschlossener, nicht gemergter Pull Request schliesst nie automatisch ein Issue;
+# das bleibt eine Entscheidung des Maintainers.
+
+on:
+  workflow_call:
+    inputs:
+      maintainer-login:
+        description: >
+          GitHub-Login, dessen Merge eines Pull Request als "Issue abgearbeitet" zaehlt.
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: read
+
+concurrency:
+  group: issue-autoclose-${{ github.repository }}
+
+jobs:
+  issue-autoclose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Ref dieses wiederverwendbaren Workflows ermitteln
+        id: ref
+        shell: bash
+        run: echo "ref=${GITHUB_WORKFLOW_REF#*@}" >> "$GITHUB_OUTPUT"
+        env:
+          GITHUB_WORKFLOW_REF: ${{ github.workflow_ref }}
+
+      - uses: actions/checkout@v7
+        with:
+          repository: f-reiser/reiser-flow
+          ref: ${{ steps.ref.outputs.ref }}
+          path: _reiser-flow
+          sparse-checkout: .github/skripte
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Selbsttest der Entscheidungslogik
+        run: python3 _reiser-flow/.github/skripte/issue_autoclose.py --selbsttest
+
+      - name: Offene Issues gegen gemergte Pull Requests abgleichen
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          MAINTAINER_LOGIN: ${{ inputs.maintainer-login }}
+        run: python3 _reiser-flow/.github/skripte/issue_autoclose.py
