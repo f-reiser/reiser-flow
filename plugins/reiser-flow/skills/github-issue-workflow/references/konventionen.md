@@ -35,6 +35,24 @@ Die Schreibweise ist bindend, `gh label list` zeigt die gültige Fassung.
 Weitere Label können hinzukommen. Ein unbekanntes Label ist kein Grund, ein Issue zu
 überspringen — aber ein Grund nachzufragen, wenn es die Behandlung ändern könnte.
 
+### Auftragslabel: die Freigabe gilt einem Stand
+
+`Einarbeiten` und `Untersuche` schalten einen unbeaufsichtigten Lauf scharf. Sie sind
+deshalb eine Freigabe — und zwar der Fassung, die zum Zeitpunkt des Setzens dastand.
+Technisch gepflegt werden sie an genau einer Stelle, `.github/labels.json`.
+
+Daraus folgen zwei Dinge, die im Alltag auffallen:
+
+- **Wer einen freigegebenen Vorgang ändert — Beschreibung bearbeiten, kommentieren,
+  einen Kommentar löschen —, verliert das Auftragslabel.** Das ist kein Fehler und
+  keine Warnung. Ein Vorgang darf sich ändern; nur gilt die Freigabe dann der alten
+  Fassung. Passt der Auftrag weiterhin, wird das Label einfach erneut gesetzt.
+- **Der Lauf arbeitet mit dem freigegebenen Text**, nicht mit dem, der beim Start
+  dasteht. Was in der Zwischenzeit dazukam, erreicht ihn nicht.
+
+Was die Automatik selbst schreibt, zählt dabei nicht als Änderung — sonst nähme sich
+jeder Lauf mit seinem ersten Fortschrittskommentar das Label ab.
+
 ### Steuerlabel: Modell, Version, Aufwand
 
 Sie sagen nichts über den Vorgang, sondern über den **Lauf**, der ihn abarbeitet — was

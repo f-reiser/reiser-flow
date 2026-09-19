@@ -33,6 +33,7 @@ import tempfile
 
 import berechtigt
 import geschuetzt
+import labels_lesen
 import modellwahl
 import scoped_labels
 
@@ -138,8 +139,9 @@ def schreiben(pfad, vorgaenge):
             f.write("%s\t%s\n" % (nr, ",".join(labels)))
 
 
-#  Dieselben zwei Label wie im Schritt "vorpruefung" von claude-aufgaben.yml.
-AUFTRAGSLABEL = ("Einarbeiten", "Untersuche")
+#  Aus labels.json, nicht noch einmal aufgezaehlt: Ein drittes Auftragslabel
+#  soll an genau einer Stelle gepflegt werden (f-reiser/reiser-flow#23).
+AUFTRAGSLABEL = tuple(labels_lesen.auftragslabel())
 
 
 def ohne_auftragslabel(bereinigt):
