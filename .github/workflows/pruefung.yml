@@ -81,6 +81,12 @@ jobs:
       - name: Welche Label geschuetzt sind
         run: python .github/skripte/geschuetzt.py --selbsttest
 
+      #  Wiederholt die Pruefungen des Label-Waechters im unbeaufsichtigten Lauf.
+      #  Der Selbsttest prueft die Verdrahtung mit: Ein Baustein, der fertig
+      #  dasteht und nicht aufgerufen wird, faellt sonst gar nicht auf.
+      - name: Label-Sicherheitsnetz
+        run: python .github/skripte/label_sicherheitsnetz.py --selbsttest
+
       #  Bricht das Blockzitat des Fortschrittskommentars auf, steht die Haelfte des
       #  Standes als Fliesstext im Vorgang - und findet die Marke ihn nicht wieder, legt
       #  jeder Lauf einen neuen an.

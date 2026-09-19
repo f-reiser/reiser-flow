@@ -151,6 +151,7 @@ jobs:
       - id: vorpruefung
         env:
           GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
         working-directory: ${{ runner.temp }}
         run: |
           #  Gibt es ein Label im Repository (noch) nicht, antwortet gh mit
@@ -191,6 +192,17 @@ jobs:
           hole number,updatedAt,title \
             '.[] | [(.number|tostring), .updatedAt, .title] | @tsv' \
             | nur_offene > kandidaten.txt
+
+          #  Sicherheitsnetz, MUSS vor zuordnung.py stehen: label-waechter.yml
+          #  nimmt ein unberechtigt gesetztes oder im selben Scope doppelt
+          #  besetztes Steuerlabel reaktiv zurueck - bricht jener Lauf ab, bleibt
+          #  das Label stehen, und dieser Schritt las es bisher ungeprueft (#6).
+          #  Das Skript bereinigt neben labels.txt auch nummern.txt und
+          #  kandidaten.txt; danach waehlt zuordnung.py nur noch aus Vorgaengen,
+          #  deren Auftragslabel Bestand hat.
+          if [ -s nummern.txt ]; then
+            python3 "$RUNNER_TEMP/reiser-flow/.github/skripte/label_sicherheitsnetz.py"
+          fi
 
           python3 "$RUNNER_TEMP/reiser-flow/.github/skripte/zuordnung.py"
 
