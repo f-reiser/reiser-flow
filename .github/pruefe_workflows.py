@@ -12,6 +12,8 @@ haelt - und die, wenn sie brechen, in FREMDEN Projekten wirken.
     5. Ausdruecke    Kein "${{ ... }}" im on:-Abschnitt.
     6. Anpinnung     Jede fremde Action haengt an einem Commit-SHA, nie an einem
                      verschiebbaren Tag - und nennt die Version als Kommentar.
+    7. Fork-Vorgang  Ein aufrufbarer Workflow, der Vorgaenge an ihrem Auftragslabel
+                     einsammelt, nimmt Pull Requests aus Forks aus.
     8. Berechtigung  Ein "permissions:"-Block nennt nur Scopes, die es gibt.
 
 WARUM 1 UND 2 KEINE STILFRAGE SIND
@@ -48,6 +50,16 @@ WARUM 6 HIER STEHT
     nicht nachgezogen wurde - und Anpinnen ohne Nachziehen tauscht ein Risiko nur
     gegen ein anderes.
 
+WARUM 7 NEBEN 3 STEHT
+    Regel 3 deckt den bekannten Weg ab, auf dem Fork-Code auf einen schreibenden
+    Runner kommt: den Checkout an pull_request_target. Der unbeaufsichtigte Lauf
+    nimmt einen anderen - er sammelt Vorgaenge an ihrem Auftragslabel ein, und ein
+    Pull Request aus einem Fork ist einer davon. Sein Branch liegt im Fork; das
+    Modell checkt ihn aus und fuehrt beim Testlauf fremden Code aus, waehrend
+    Schreibtoken und OAuth-Token in der Umgebung liegen (f-reiser/reiser-flow#22).
+    Weder pull_request_target noch ein "ref:" kommen dabei vor - Regel 3 sieht
+    diesen Weg strukturell nicht (#26).
+
 WARUM 8 SO TEUER WAR
     Die Scopes von GITHUB_TOKEN sind eine geschlossene Liste. Steht in einem
     "permissions:"-Block etwas, das nicht dazugehoert, weist GitHub die GANZE Datei
@@ -61,10 +73,6 @@ WARUM 8 SO TEUER WAR
     Die Faehigkeit, ".github/workflows/*.yml" zu pushen, gibt es als Workflow-
     Berechtigung nicht. Sie haengt am Token selbst - ein Personal Access Token kann
     sie tragen, GITHUB_TOKEN nicht.
-
-    Die Nummer 7 ist ausgelassen: sie gehoert zum Ausschluss von Fork-Pull-Requests,
-    der noch als Pull Request zu f-reiser/reiser-flow#22 offen ist. So passt sie in
-    beliebiger Reihenfolge nach main, ohne die anderen umzunummerieren.
 
 Aufruf ohne Argument prueft dieses Repository, mit --selbsttest die Pruefung selbst.
 """
@@ -110,6 +118,18 @@ def projektwort_trifft(wort, text):
     if not wort.startswith("."):
         return wort in text
     return re.search(re.escape(wort) + r"(?![A-Za-z0-9_])", text) is not None
+
+
+#  Ein Vorgang wird an seinem Auftragslabel eingesammelt - "gh issue list --label"
+#  und "gh pr list --label". Geprueft wird der ganze SCHRITT, nicht die einzelne
+#  Zeile: In claude-aufgaben.yml steht das "pr" nicht im Aufruf, sondern kommt als
+#  Parameter einer Shell-Funktion an (gh "$1" list). Eine zeilengenaue Regel
+#  waere genau dort blind, wo es darauf ankommt.
+SAMMELT_NACH_LABEL = re.compile(r"\bgh\b[^\n]*\blist\b[^\n]*--label")
+
+#  Das Feld, das einen Fork-Pull-Request von einem eigenen unterscheidet. "gh pr
+#  list" liefert es ohne zusaetzlichen API-Aufruf mit.
+FORK_FELD = "isCrossRepository"
 
 #  Die Scopes, die GitHub in einem "permissions:"-Block kennt. Geschlossene Liste:
 #  Was hier fehlt, macht die ganze Datei ungueltig. Kommt ein neuer Scope dazu,
@@ -302,6 +322,12 @@ def befunde(name, roh):
                 melde(zeile, "holt %s ohne %s - der Stand ist nicht verriegelt"
                       % (DIESES_REPOSITORY, RICHTIGER_SELBSTBEZUG))
 
+            if SAMMELT_NACH_LABEL.search(block) and FORK_FELD not in block:
+                melde(zeile, "sammelt Vorgaenge am Auftragslabel ein, ohne "
+                             "Fork-Pull-Requests auszunehmen (%s) - ihr Branch "
+                             "traegt fremden Code, den ein Lauf mit Schreibtoken "
+                             "auscheckt und ausfuehrt" % FORK_FELD)
+
             for wort in PROJEKTWOERTER:
                 if projektwort_trifft(wort, block):
                     melde(zeile, "projektspezifisch: %r gehoert nicht in einen "
@@ -387,6 +413,20 @@ jobs:
         run: echo hallo
 """
 
+#  Ein aufrufbarer Workflow, der Vorgaenge einsammelt - so, wie er sein soll.
+SAMMEL_MUSTER = """name: Sammeln
+on:
+  workflow_call:
+jobs:
+  tun:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Vorgaenge holen
+        run: |
+          gh issue list --label Einarbeiten --state open --json number
+          gh pr list --label Einarbeiten --state open --json number,isCrossRepository
+"""
+
 
 def selbsttest():
     fehler = []
@@ -451,6 +491,32 @@ def selbsttest():
                 eigener.replace("          path: _reiser-flow",
                                 "          path: _reiser-flow" + ZL
                                 + "          ref: irgendwas"), False)
+
+    #  Regel 7, gruen: das unveraenderte Sammel-Muster.
+    pruefe_text("Sammel-Muster unveraendert", "sammeln.yml", SAMMEL_MUSTER, False)
+
+    #  Mutation 6: der Fork-Filter faellt weg - genau der Zustand vor #22.
+    pruefe_text("Mutation ohne Fork-Filter", "sammeln.yml",
+                SAMMEL_MUSTER.replace(",isCrossRepository", ""), True)
+
+    #  Gegenprobe zu 7, erste Verengung: Wer Pull Requests nicht am Label sucht,
+    #  sammelt keine Vorgaenge ein - pruefung-vermerken.yml sucht den Pull Request
+    #  zu einem Branch und braucht den Filter nicht.
+    pruefe_text("Suche ohne Label ist kein Einsammeln", "sammeln.yml",
+                SAMMEL_MUSTER.replace(
+                    "          gh issue list --label Einarbeiten --state open "
+                    "--json number" + ZL
+                    + "          gh pr list --label Einarbeiten --state open "
+                    "--json number,isCrossRepository",
+                    "          gh pr list --head \"$BRANCH\" --state open "
+                    "--json number"),
+                False)
+
+    #  Gegenprobe zu 7, zweite Verengung: In einem nicht aufrufbaren Workflow gilt
+    #  die Regel nicht - er laeuft nicht unbeaufsichtigt in fremden Projekten.
+    pruefe_text("nicht aufrufbar: Einsammeln ohne Filter erlaubt", "eigen.yml",
+                SAMMEL_MUSTER.replace("  workflow_call:", "  push:")
+                             .replace(",isCrossRepository", ""), False)
 
     #  Regel 8, gruen: nur Scopes, die es gibt - am Job wie am Workflow.
     pruefe_text("Rechte-Muster unveraendert", "rechte.yml", RECHTE_MUSTER, False)
@@ -563,8 +629,12 @@ def selbsttest():
     if "runs-on" in aus or "workflow_call" not in aus:
         fehler.append("ausloeser_block(): falsch abgegrenzt (%r)" % aus[:80])
 
-    gesamt = (2 + len(FALSCHER_SELBSTBEZUG) + 1 + 1 + len(PROJEKTWOERTER) + 1
-              + 3 + 1 + 1 + 2 + 1 + 2 + 1 + 5 + 6)
+    #  Nicht mehr als Kette einzelner Feature-Zuwaechse geschrieben (die letzte
+    #  Fassung geriet dadurch beim Zusammenfuehren zweier Aenderungen in Konflikt,
+    #  die beide unabhaengig voneinander eine eigene Pruefung ergaenzt hatten -
+    #  #22 und #24): feste Pruefungen plus je eine je Eintrag in den beiden
+    #  Listen oben.
+    gesamt = 31 + len(FALSCHER_SELBSTBEZUG) + len(PROJEKTWOERTER)
     for f in fehler:
         print("FEHLER: " + f)
     print("%d von %d Pruefungen bestanden." % (gesamt - len(fehler), gesamt))
