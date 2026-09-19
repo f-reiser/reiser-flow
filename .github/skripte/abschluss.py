@@ -92,12 +92,19 @@ def zahl(n):
     return "{:,}".format(int(n)).replace(",", ".")
 
 
-def zeilen(meldung, skills, ergebnis, bemerkung, lauf_url, wanduhr_s=None):
+def zeilen(meldung, skills, ergebnis, bemerkung, lauf_url, wanduhr_s=None,
+           branches=None):
     """Der Text des Abschlusskommentars als Liste von Zeilen."""
     z = ["## Abschluss des Laufs", ""]
     z.append("Ergebnis: **%s**" % (ergebnis or "unbekannt"))
     if bemerkung:
         z += ["", bemerkung]
+    #  Die Branch-Auffrischung laeuft im selben Aufruf wie der Vorgang, hat mit
+    #  ihm aber nichts zu tun - sie muss deshalb sichtbar sein, auch wenn der
+    #  Vorgang selbst nichts davon merkt (f-reiser/reiser-flow#7).
+    if branches:
+        z += ["", "Aufgefrischte Branches: "
+              + ", ".join("`%s`" % b for b in branches)]
     z.append("")
 
     z.append("### Skills")
@@ -180,11 +187,13 @@ def main():
     skills = []
     ergebnis = os.environ.get("AUSGANG")
     bemerkung = ""
+    branches = []
     try:
         d = json.loads(os.environ.get("SCHLUSSMELDUNG") or "{}")
         skills = [str(s) for s in (d.get("skills") or [])]
         ergebnis = d.get("ergebnis") or ergebnis
         bemerkung = d.get("bemerkung") or ""
+        branches = [str(b) for b in (d.get("branches") or [])]
     except ValueError:
         print("::warning::Schlussmeldung ist kein gueltiges JSON.")
 
@@ -193,7 +202,7 @@ def main():
         ergebnismeldung(roh), skills, ergebnis, bemerkung,
         "%s/%s/actions/runs/%s" % (os.environ.get("GITHUB_SERVER_URL", ""),
                                    repo, os.environ.get("GITHUB_RUN_ID", "")),
-        int(wanduhr) if wanduhr.isdigit() else None))
+        int(wanduhr) if wanduhr.isdigit() else None, branches))
 
     #  Ausserhalb des Arbeitsverzeichnisses, damit der Rettungsschritt des
     #  Workflows die Datei nicht mitcommittet.
@@ -295,7 +304,14 @@ def selbsttest():
     echt = NL.join(zeilen(fertig, [], None, "", "http://l", wanduhr_s=90))
     fehlt_nicht("Wanduhr weicht der echten Dauer", echt, "Uhr des Runners")
 
-    gesamt = 32
+    #  Aufgefrischte Branches: sichtbar, wenn es welche gab - und keine leere
+    #  Ueberschrift, wenn nicht.
+    mit_br = NL.join(zeilen(fertig, [], "nur_branches", "", "http://l",
+                            branches=["issue-7-x", "issue-9-y"]))
+    enthaelt("Branches genannt", mit_br, "`issue-7-x`, `issue-9-y`")
+    fehlt_nicht("keine leere Branch-Zeile", voll, "Aufgefrischte Branches")
+
+    gesamt = 34
     for f in fehler:
         print("FEHLER: " + f)
     print("%d von %d Pruefungen bestanden." % (gesamt - len(fehler), gesamt))

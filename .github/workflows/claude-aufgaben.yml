@@ -194,11 +194,29 @@ jobs:
 
           python3 "$RUNNER_TEMP/reiser-flow/.github/skripte/zuordnung.py"
 
+          #  Zweite, vom Vorgang unabhaengige Vorpruefung: Welche Branches sind
+          #  gegenueber ihrer Basis veraltet? Sie kostet zwei API-Aufrufe und
+          #  entscheidet, ob der Lauf unten ueberhaupt etwas zu tun hat - die
+          #  gleiche Frage im Modell zu stellen kostete einen ganzen Lauf (#7).
+          #
+          #  Die Basis kommt aus dem offenen Pull Request, nicht pauschal main:
+          #  Ein Branch, der laut git-branch-strategie von einem blockierenden
+          #  Branch abzweigt, verloere durch ein Rebase auf main genau die
+          #  Commits, derentwegen er dort abzweigt. Fork-Pull-Requests bleiben
+          #  draussen - ihr Kopf liegt nicht in diesem Repository.
+          gh pr list -R "$GITHUB_REPOSITORY" --state open --limit 100 \
+            --json headRefName,baseRefName,isCrossRepository \
+            --jq '.[] | select(.isCrossRepository | not)
+                      | [.headRefName, .baseRefName] | @tsv' \
+            2>/dev/null > basen.txt || true
+
+          python3 "$RUNNER_TEMP/reiser-flow/.github/skripte/veraltete_branches.py"
+
       #  Welches Modell und welcher Aufwand - aus den Labels, nach festen Regeln.
       #  Das MUSS hier stehen und nicht im Prompt: Ein Lauf kann sein eigenes
       #  Modell nicht mehr waehlen, wenn er schon laeuft.
       - id: modell
-        if: steps.vorpruefung.outputs.offen != '0'
+        if: steps.vorpruefung.outputs.offen != '0' || steps.vorpruefung.outputs.veraltet != ''
         working-directory: ${{ runner.temp }}
         run: python3 "$RUNNER_TEMP/reiser-flow/.github/skripte/modellwahl.py"
 
@@ -246,12 +264,12 @@ jobs:
       #  die Uhr des Runners zur Verfuegung - sie misst mehr als die API-Zeit,
       #  und der Kommentar sagt das dann auch.
       - id: uhr
-        if: steps.vorpruefung.outputs.offen != '0'
+        if: steps.vorpruefung.outputs.offen != '0' || steps.vorpruefung.outputs.veraltet != ''
         run: echo "start=$(date +%s)" >> "$GITHUB_OUTPUT"
 
       #  id wieder da: Der letzte Schritt liest die strukturierte Ausgabe.
       - id: claude
-        if: steps.vorpruefung.outputs.offen != '0'
+        if: steps.vorpruefung.outputs.offen != '0' || steps.vorpruefung.outputs.veraltet != ''
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -299,7 +317,7 @@ jobs:
             --permission-mode acceptEdits
             --allowedTools "Bash(gh *),Bash(git *),Bash(python3 *),Bash(python *),Bash(cd *),Task,Agent"
             --disallowedTools "Bash(gh pr merge *),Bash(gh release *),Bash(gh workflow disable *),Bash(gh workflow enable *),Bash(gh secret *),Bash(gh variable *),Bash(gh label *),Bash(gh repo delete *)"
-            --json-schema '{"type":"object","additionalProperties":false,"required":["skills","ergebnis"],"properties":{"skills":{"type":"array","items":{"type":"string"},"description":"Namen der Skills, die in diesem Lauf geladen waren und angewandt wurden"},"ergebnis":{"type":"string","enum":["abgearbeitet","nichts_gefunden","zurueckgestellt","rueckfrage","abgebrochen"]},"vorgang":{"type":"string","description":"Nummer des bearbeiteten Issues oder Pull Requests, sonst leer"},"bemerkung":{"type":"string"}}}'
+            --json-schema '{"type":"object","additionalProperties":false,"required":["skills","ergebnis"],"properties":{"skills":{"type":"array","items":{"type":"string"},"description":"Namen der Skills, die in diesem Lauf geladen waren und angewandt wurden"},"ergebnis":{"type":"string","enum":["abgearbeitet","nichts_gefunden","zurueckgestellt","rueckfrage","abgebrochen","nur_branches"]},"vorgang":{"type":"string","description":"Nummer des bearbeiteten Issues oder Pull Requests, sonst leer"},"bemerkung":{"type":"string"},"branches":{"type":"array","items":{"type":"string"},"description":"Branches, die dieser Lauf auf ihre Basis aufgefrischt hat"}}}'
           prompt: |
             Automatischer Durchgang: Vorgaenge mit einem Auftragslabel
             abarbeiten - Issues wie Pull Requests - in diesem Repository.
@@ -309,8 +327,13 @@ jobs:
             nachstellen und analysieren. Was jeweils zu tun ist, steht im
             Skill - fuer "Untersuche" im Abschnitt "Bugs untersuchen".
 
-            Ein Schritt davor hat bereits geprueft, dass mindestens einer
-            offen ist; du wirst gar nicht erst gestartet, wenn nichts anliegt.
+            Dazu kommt eine zweite, davon unabhaengige Aufgabe: veraltete
+            Branches auffrischen (Abschnitt 4). Sie haengt am selben Aufruf,
+            damit Skills und Projektstruktur nur einmal bezahlt werden.
+
+            Ein Schritt davor hat geprueft, dass mindestens eines von beidem
+            anliegt; du wirst gar nicht erst gestartet, wenn nichts ansteht.
+            Es kann also sein, dass NUR Abschnitt 4 etwas zu tun hat.
 
             ## 1. Was liegt an?
 
@@ -323,6 +346,10 @@ jobs:
             letzten Sekunden entfernt -, beenden und das melden.
 
             ## 2. Der Vorgang steht schon fest
+
+            Ist die Zeile "Vorgang:" unten leer, liegt kein Vorgang an und
+            dieser Abschnitt wie auch Abschnitt 3 entfallen - dann geht es
+            direkt zu Abschnitt 4.
 
             Vorgang: #${{ steps.vorpruefung.outputs.vorgang }}
             Branch:  ${{ steps.vorpruefung.outputs.branch }} - angelegt, gepusht
@@ -410,6 +437,35 @@ jobs:
             Regeln nicht aus dem Gedaechtnis nach - pruefe wirklich nach, ob sie
             geladen sind, statt es anzunehmen.
 
+            ## 4. Nachlauf: veraltete Branches auffrischen
+
+            Veraltet: ${{ steps.vorpruefung.outputs.veraltet }}
+
+            Ist die Zeile leer, ist hier nichts zu tun - dieser Abschnitt
+            entfaellt dann vollstaendig, ohne Nachsehen und ohne Meldung.
+
+            Steht dort etwas, ist es eine kommagetrennte Liste von Branches,
+            die hinter ihrer Basis zurueckliegen. Die Vorpruefung hat ihre
+            Basis bereits beruecksichtigt - rebase jeden davon auf die Basis
+            SEINES offenen Pull Requests (`gh pr list --head <branch> --json
+            baseRefName`), bei einem Branch ohne Pull Request auf `main`. Nicht
+            pauschal auf main: Ein Branch, der laut git-branch-strategie von
+            einem blockierenden Branch abzweigt, verloere dabei genau die
+            Commits, derentwegen er dort abzweigt.
+
+            Konflikte loest du sofort und selbst - git-branch-strategie,
+            "Merge-Konflikte loest du". Danach die Pruefungen des Projekts
+            laufen lassen und `git push --force-with-lease`. Erst bei Gruen.
+
+            Kommst du bei einem Branch nach ernsthaftem Versuch nicht sicher
+            zu einer Entscheidung, welches Verhalten gewollt ist, lass genau
+            diesen Branch stehen und nenne ihn in der Schlussmeldung. Die
+            uebrigen machst du trotzdem fertig.
+
+            Jeden aufgefrischten Branch nennst du in der Schlussmeldung unter
+            "branches" - daraus entsteht der sichtbare Vermerk im
+            Abschlusskommentar.
+
             ## Abweichungen von der lokalen Ausfuehrung
 
             Der lokale Schluesselbund fehlt: `gh auth token --user ...` gibt es
@@ -443,6 +499,11 @@ jobs:
             fehlen. Eine falsche Angabe ist schlimmer als eine fehlende, weil
             sie die Pruefung wertlos macht.
 
+            Das Feld "branches" nennt die Branches, die du in Abschnitt 4
+            aufgefrischt hast - leer, wenn keiner. Hattest du NUR dort etwas
+            zu tun und keinen Vorgang, ist "ergebnis" nicht
+            "nichts_gefunden", sondern "nur_branches": Es lag ja etwas an.
+
             ## Rueckmeldung
 
             Kurz. Immer: unter welcher Identitaet gearbeitet wurde und ob die
@@ -451,7 +512,8 @@ jobs:
             oder Entscheidung gesetzt (Nummer und woran es haengt) / Issue ohne
             eindeutigen Typ gesehen (Nummern) / etwas gefunden, aber liegen
             gelassen (welcher Vorgang und warum). Das Letzte ist NICHT
-            "nichts gefunden".
+            "nichts gefunden". Dazu, falls Abschnitt 4 etwas zu tun hatte:
+            welche Branches aufgefrischt wurden und welche stehen blieben.
 
       #  Die Angabe, welche Skills gegolten haben, ist Selbstauskunft - aber
       #  eine, die hier zur Bedingung wird und den Job rot werden laesst.
@@ -485,7 +547,10 @@ jobs:
           #  git-branch-strategie nur, wenn wirklich gearbeitet wurde - eine
           #  Pflicht, die auch auf einen Leerlauf zutraefe, wuerde falsch rot.
           pflicht = ['github-issue-workflow']
-          if ergebnis == 'abgearbeitet':
+          #  Auch das Auffrischen veralteter Branches ist Branch-Arbeit: Rebase,
+          #  Konflikte, Force-with-lease. Ohne diese Zeile faende ein Lauf, der
+          #  NUR das getan hat, hier keine Pflicht vor.
+          if ergebnis == 'abgearbeitet' or d.get('branches'):
               pflicht.append('git-branch-strategie')
 
           #  Teilstring: Der Lauf darf 'reiser-flow:github-issue-workflow'

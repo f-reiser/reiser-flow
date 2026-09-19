@@ -136,6 +136,18 @@ def schritte(text):
     return bloecke
 
 
+def nennt_projektwort(block, wort):
+    """Ob 'block' das Projektwort nennt.
+
+    Ein Wort mit fuehrendem Punkt ist eine Dateiendung und wird nur mit
+    Wortgrenze gesucht: ".bas" sprang sonst auf ".baseRefName" an, und damit
+    liess sich das Basis-Feld eines gh-Aufrufs nicht mehr abfragen.
+    """
+    if wort.startswith("."):
+        return re.search(re.escape(wort) + r"\b", block) is not None
+    return wort in block
+
+
 def setzt_ref(block):
     return re.search(r"^\s*ref\s*:", block, re.M) is not None
 
@@ -228,7 +240,7 @@ def befunde(name, roh):
                       % (DIESES_REPOSITORY, RICHTIGER_SELBSTBEZUG))
 
             for wort in PROJEKTWOERTER:
-                if wort in block:
+                if nennt_projektwort(block, wort):
                     melde(zeile, "projektspezifisch: %r gehoert nicht in einen "
                                  "aufrufbaren Workflow" % wort)
 
@@ -346,6 +358,13 @@ def selbsttest():
         pruefe_text("Mutation Projektwort %r" % wort, "muster.yml",
                     MUSTER.replace("run: python3", "run: %s python3" % wort), True)
 
+    #  Gegenprobe zu 4: Eine Dateiendung ist nur eine, wenn danach Schluss ist.
+    #  ".baseRefName" ist ein Feld von "gh pr list", kein VBA-Modul.
+    pruefe_text("Feldname mit derselben Vorsilbe", "muster.yml",
+                MUSTER.replace("run: python3",
+                               "run: gh pr list --jq '.[].baseRefName' #"),
+                False)
+
     #  Gegenprobe zu 1/2/4: In einem NICHT aufrufbaren Workflow ist all das erlaubt -
     #  dort meint github.workflow_ref die Datei selbst, und die eigene CI darf ihr
     #  eigenes Projekt beim Namen nennen.
@@ -447,7 +466,7 @@ def selbsttest():
         fehler.append("ausloeser_block(): falsch abgegrenzt (%r)" % aus[:80])
 
     gesamt = (2 + len(FALSCHER_SELBSTBEZUG) + 1 + 1 + len(PROJEKTWOERTER)
-              + 3 + 1 + 1 + 2 + 1 + 2 + 1 + 5)
+              + 3 + 1 + 1 + 2 + 1 + 2 + 1 + 1 + 5)
     for f in fehler:
         print("FEHLER: " + f)
     print("%d von %d Pruefungen bestanden." % (gesamt - len(fehler), gesamt))
