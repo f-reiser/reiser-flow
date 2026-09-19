@@ -156,7 +156,9 @@ def zeilen(meldung, skills, ergebnis, bemerkung, lauf_url, wanduhr_s=None):
     if verweigert:
         z += ["", "### Verweigerte Werkzeuge",
               "Der Lauf wollte %d Aufruf(e) machen, die die Sperrliste des "
-              "Workflows nicht erlaubt." % len(verweigert)]
+              "Workflows nicht erlaubt. Die Liste faengt den Fehlgriff ab; "
+              "sie ist keine Grenze gegen einen Lauf, der sie umgehen will "
+              "(f-reiser/reiser-flow#21)." % len(verweigert)]
 
     z += ["", "[Lauf im Actions-Verlauf](%s)" % lauf_url]
     return z
