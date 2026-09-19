@@ -23,23 +23,42 @@ Die Schreibweise ist bindend, `gh label list` zeigt die gültige Fassung.
 |---|---|---|---|
 | `Dokumentation` | es geht um Dokumentation jeder Art | Claude, Nutzer | beide |
 | `Duplikat` | dupliziert ein anderes Issue | Claude, Nutzer | beide |
-| `Einarbeiten` | durchgesehen, kann umgesetzt werden | **nur Nutzer** | beide |
+| `Einarbeiten` | durchgesehen, kann umgesetzt werden | **nur Admin/Maintainer** | beide |
 | `Entscheidung` | zwei oder mehr echte Alternativen, der Nutzer muss eine wählen | **nur Claude** | beide |
-| `Gegenlese` | für diesen Vorgang ist nach der Arbeit eine fremde Gegenlese zu fahren | **nur Nutzer** | **nur Claude**, wenn sie gelaufen ist |
+| `Gegenlese` | für diesen Vorgang ist nach der Arbeit eine fremde Gegenlese zu fahren | **nur Admin/Maintainer** | **nur Claude**, wenn sie gelaufen ist |
 | `GegenleseBefund` | die Gegenlese hat einen bestätigten Befund ergeben | **nur Claude** | beide |
 | `Lokale Arbeit` | der Rest des Vorgangs geht nur lokal — ein unbeaufsichtigter Lauf kann ihn nicht zu Ende bringen | **nur Claude** | beide |
 | `Pruefluecke` | eine Prüfung kann strukturell nicht anschlagen | **nur Claude** | beide |
 | `Rückfrage` | Klärung noch offen — von Claude an den Nutzer oder umgekehrt, siehe `SKILL.md` „Eine Rückfrage beantworten" | Claude, Nutzer | beide |
-| `Untersuche` | Bug nachstellen; Verfahren in `SKILL.md`, „Bugs untersuchen" | **nur Nutzer** | Claude nach der Analyse |
+| `Untersuche` | Bug nachstellen; Verfahren in `SKILL.md`, „Bugs untersuchen" | **nur Admin/Maintainer** | Claude nach der Analyse |
 | `Verworfen` | wird nicht umgesetzt, braucht Begründung als Kommentar | **nur Nutzer** | Nutzer |
 
 Weitere Label können hinzukommen. Ein unbekanntes Label ist kein Grund, ein Issue zu
 überspringen — aber ein Grund nachzufragen, wenn es die Behandlung ändern könnte.
 
+### Wer „Admin/Maintainer" ist — und was davon erzwungen wird
+
+Gemeint ist die Rolle auf dem Repository, nicht eine bestimmte Person. In einem
+Projekt mit mehreren Beteiligten soll nicht nur der Eigentümer Arbeit freischalten
+können, sondern auch Vertrauenswürdige, die nicht die vollen Rechte auf das
+Repository brauchen — genau dafür gibt es die Maintainer-Rolle. Vergeben kann sie
+ohnehin nur ein Admin.
+
+**Erzwungen** ist das für `Einarbeiten`, `Gegenlese`, `Untersuche` und die drei
+Steuerlabel-Scopes: `label-waechter.yml` nimmt sie zurück, wenn sie von einem
+anderen Konto kommen (`.github/skripte/berechtigt.py`, `ERLAUBT = ("admin",
+"maintain")`). Die übrigen Zeilen der Tabelle sind **Konvention** — `Verworfen` etwa
+kann technisch jeder setzen, der überhaupt Label vergeben darf.
+
+Bis zum 19.09.2026 stand hier „nur Nutzer". Das war seit der Erweiterung auf
+Maintainer (PR #54 vom 13.09.2026) überholt und musste im Sicherheitslauf #19 als
+Abweichung zwischen Doku und Durchsetzung gemeldet werden (#29). Wer die Rollen
+wieder verengen will, ändert `berechtigt.py` — und diese Stelle mit.
+
 ### Steuerlabel: Modell, Version, Aufwand
 
 Sie sagen nichts über den Vorgang, sondern über den **Lauf**, der ihn abarbeitet — was
-er kosten darf. Alle drei Scopes: **nur Nutzer**, entfernen dürfen beide.
+er kosten darf. Alle drei Scopes: **nur Admin/Maintainer**, entfernen dürfen beide.
 
 Scoped Labels nach dem Vorbild von GitLab: `Scope::Wert`. Zwei Label mit demselben Scope
 schließen einander aus, verschiedene Scopes lassen sich frei kombinieren.
