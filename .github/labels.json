@@ -5,6 +5,7 @@
     { "name": "Duplicate", "farbe": "cfd3d7", "beschreibung": "Dupliziert ein anderes Issue" },
     { "name": "Einarbeiten", "farbe": "0e8a16", "beschreibung": "Durchgesehen, kann umgesetzt werden", "geschuetzt": true },
     { "name": "Entscheidung", "farbe": "d93f0b", "beschreibung": "Zwei oder mehr echte Alternativen, der Nutzer muss eine waehlen" },
+    { "name": "Lokale Arbeit", "farbe": "0b6b78", "beschreibung": "Wartet auf den Nutzer: der Rest geht nur lokal, nicht im unbeaufsichtigten Lauf" },
     { "name": "Gegenlese", "farbe": "5319e7", "beschreibung": "Fuer diesen Vorgang ist nach der Arbeit eine fremde Gegenlese zu fahren", "geschuetzt": true },
     { "name": "GegenleseBefund", "farbe": "b60205", "beschreibung": "Die Gegenlese hat einen bestaetigten Befund ergeben" },
     { "name": "Pruefluecke", "farbe": "e4e669", "beschreibung": "Eine Pruefung kann strukturell nicht anschlagen" },

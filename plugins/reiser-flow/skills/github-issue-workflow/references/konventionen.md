@@ -27,6 +27,7 @@ Die Schreibweise ist bindend, `gh label list` zeigt die gültige Fassung.
 | `Entscheidung` | zwei oder mehr echte Alternativen, der Nutzer muss eine wählen | **nur Claude** | beide |
 | `Gegenlese` | für diesen Vorgang ist nach der Arbeit eine fremde Gegenlese zu fahren | **nur Nutzer** | **nur Claude**, wenn sie gelaufen ist |
 | `GegenleseBefund` | die Gegenlese hat einen bestätigten Befund ergeben | **nur Claude** | beide |
+| `Lokale Arbeit` | der Rest des Vorgangs geht nur lokal — ein unbeaufsichtigter Lauf kann ihn nicht zu Ende bringen | **nur Claude** | beide |
 | `Pruefluecke` | eine Prüfung kann strukturell nicht anschlagen | **nur Claude** | beide |
 | `Rückfrage` | die Richtung steht fest, es fehlt nur die Schärfe | **nur Claude** | beide |
 | `Untersuche` | Bug nachstellen; Verfahren in `SKILL.md`, „Bugs untersuchen" | **nur Nutzer** | Claude nach der Analyse |
