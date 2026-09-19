@@ -10,6 +10,7 @@ haelt - und die, wenn sie brechen, in FREMDEN Projekten wirken.
     3. Fremder Code  Ein Workflow an pull_request_target checkt keinen "ref:" aus.
     4. Projektfrei   Ein aufrufbarer Workflow nennt keine Projektspezifika.
     5. Ausdruecke    Kein "${{ ... }}" im on:-Abschnitt.
+    8. Berechtigung  Ein "permissions:"-Block nennt nur Scopes, die es gibt.
 
 WARUM 1 UND 2 KEINE STILFRAGE SIND
     In einem per workflow_call aufgerufenen Workflow zeigen github.workflow_ref und
@@ -30,6 +31,24 @@ WARUM 3 HIER STEHT
     Request holte damit fremden Fork-Code auf einen Runner, der schreiben darf.
     Bisher war das nur eine Zeile Prosa in einer Checkliste (Abschnitt A in
     f-reiser/reiser-flow#12) - Prosa haelt niemanden auf.
+
+WARUM 8 SO TEUER WAR
+    Die Scopes von GITHUB_TOKEN sind eine geschlossene Liste. Steht in einem
+    "permissions:"-Block etwas, das nicht dazugehoert, weist GitHub die GANZE Datei
+    zurueck: Der Lauf hat keine Jobs, meldet nur "workflow file issue" und taucht im
+    Verlauf als Fehlschlag mit dem Ereignis des Pushes auf - auch wenn die Datei gar
+    nicht auf push hoert. Am 19.09.2026 stand so "workflows: write" in
+    claude-aufgaben.yml und selbst-aufgaben.yml; der Cron-Lauf des Repositories lief
+    daraufhin ueberhaupt nicht mehr, und die Pruefung hier blieb gruen
+    (f-reiser/reiser-flow#43).
+
+    Die Faehigkeit, ".github/workflows/*.yml" zu pushen, gibt es als Workflow-
+    Berechtigung nicht. Sie haengt am Token selbst - ein Personal Access Token kann
+    sie tragen, GITHUB_TOKEN nicht.
+
+    Die Nummern 6 und 7 sind ausgelassen: Sie gehoeren zu Regeln, die noch als Pull
+    Request offen sind (f-reiser/reiser-flow#24 und #22). So passen alle drei in
+    beliebiger Reihenfolge nach main, ohne sich gegenseitig umzunummerieren.
 
 Aufruf ohne Argument prueft dieses Repository, mit --selbsttest die Pruefung selbst.
 """
@@ -61,6 +80,18 @@ HOLT_DIESES_REPOSITORY = re.compile(
 #  Herausloesen etwas liegengeblieben.
 PROJEKTWOERTER = ("Makros", ".bas", ".xlsm", "openpyxl", "cp1252",
                   "Stoffverteilungsplan", "pruefe_alles")
+
+#  Die Scopes, die GitHub in einem "permissions:"-Block kennt. Geschlossene Liste:
+#  Was hier fehlt, macht die ganze Datei ungueltig. Kommt ein neuer Scope dazu,
+#  gehoert er hierher - eine Zeile, gegen einen Ausfall des gesamten Repositories.
+ERLAUBTE_BERECHTIGUNGEN = (
+    "actions", "attestations", "checks", "contents", "deployments", "discussions",
+    "id-token", "issues", "models", "packages", "pages", "pull-requests",
+    "repository-projects", "security-events", "statuses",
+)
+
+BERECHTIGUNGSBLOCK = re.compile(r"^(\s*)permissions\s*:\s*$")
+EINTRAG = re.compile(r"^(\s*)([A-Za-z][A-Za-z0-9-]*)\s*:")
 
 #  Eine Zeile, die einen Schritt beginnt.
 SCHRITT_BEGINN = re.compile(r"^\s*-\s+(uses|name|id|run|if)\s*:")
@@ -109,6 +140,38 @@ def setzt_ref(block):
     return re.search(r"^\s*ref\s*:", block, re.M) is not None
 
 
+def unbekannte_berechtigungen(text):
+    """[(Zeilennummer, Scope)] fuer jeden Eintrag in einem "permissions:"-Block,
+    den GitHub nicht kennt.
+
+    Ein Block endet, sobald eine Zeile wieder hoechstens so weit eingerueckt ist
+    wie das "permissions:" selbst. "permissions: read-all" auf einer Zeile ist
+    kein Block und wird nicht angefasst.
+    """
+    zeilen = text.split(ZL)
+    gefunden = []
+    i = 0
+    while i < len(zeilen):
+        kopf = BERECHTIGUNGSBLOCK.match(zeilen[i])
+        if not kopf:
+            i += 1
+            continue
+        tiefe = len(kopf.group(1))
+        i += 1
+        while i < len(zeilen):
+            z = zeilen[i]
+            if not z.strip():
+                i += 1
+                continue
+            eintrag = EINTRAG.match(z)
+            if not eintrag or len(eintrag.group(1)) <= tiefe:
+                break
+            if eintrag.group(2) not in ERLAUBTE_BERECHTIGUNGEN:
+                gefunden.append((i + 1, eintrag.group(2)))
+            i += 1
+    return gefunden
+
+
 def ausloeser_block(text):
     """Der "on:"-Abschnitt - von "on:" bis zum naechsten Schluessel ganz links."""
     zeilen = text.split(ZL)
@@ -141,6 +204,11 @@ def befunde(name, roh):
     #  ohne die Stelle zu nennen. Genau so ist es am 18.09.2026 passiert: In der
     #  description eines workflow_call-Eingabewertes stand ein Beispiel mit
     #  "needs.<job>.result", gemeint als Text.
+    for zeile, scope in unbekannte_berechtigungen(text):
+        melde(zeile, "%r ist keine Berechtigung, die GitHub kennt - ein "
+                     "unbekannter Schluessel macht die ganze Datei ungueltig, "
+                     "und der Lauf meldet dann nur 'workflow file issue'" % scope)
+
     zeile, aus = ausloeser_block(text)
     if "${{" in aus:
         melde(zeile, "Ausdruck ${{ ... }} im on:-Abschnitt - dort gibt es keine "
@@ -208,6 +276,22 @@ jobs:
           path: _reiser-flow
       - name: Etwas tun
         run: python3 _reiser-flow/.github/skripte/etwas.py
+"""
+
+#  Ein Workflow mit Berechtigungen auf beiden Ebenen - oben am Workflow, unten am
+#  Job. Beide muessen geprueft werden; der Ausfall vom 19.09.2026 sass oben.
+RECHTE_MUSTER = """name: Rechte
+on:
+  workflow_call:
+jobs:
+  tun:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - name: Etwas tun
+        run: echo hallo
 """
 
 FORK_MUSTER = """name: Fork
@@ -280,6 +364,34 @@ def selbsttest():
                                 "          path: _reiser-flow" + ZL
                                 + "          ref: irgendwas"), False)
 
+    #  Regel 8, gruen: nur Scopes, die es gibt - am Job wie am Workflow.
+    pruefe_text("Rechte-Muster unveraendert", "rechte.yml", RECHTE_MUSTER, False)
+
+    #  Mutation 7: genau der Ausfall vom 19.09.2026.
+    pruefe_text("Mutation unbekannte Berechtigung", "rechte.yml",
+                RECHTE_MUSTER.replace("      id-token: write",
+                                      "      workflows: write"), True)
+
+    #  Auch oben am Workflow, nicht nur am Job.
+    pruefe_text("Mutation am Workflow statt am Job", "rechte.yml",
+                RECHTE_MUSTER.replace("jobs:",
+                                      "permissions:" + ZL
+                                      + "  workflows: write" + ZL + "jobs:"),
+                True)
+
+    #  Gegenprobe zu 8, erste Verengung: Der Block endet mit der Einrueckung.
+    #  "jobs:" oder "steps:" danach sind keine Berechtigungen.
+    if unbekannte_berechtigungen(RECHTE_MUSTER):
+        fehler.append("Regel 8: Schluessel ausserhalb des Blocks mitgezaehlt (%r)"
+                      % (unbekannte_berechtigungen(RECHTE_MUSTER),))
+
+    #  Gegenprobe zu 8, zweite Verengung: "permissions: read-all" ist kein Block.
+    pruefe_text("Kurzform read-all ist kein Block", "rechte.yml",
+                RECHTE_MUSTER.replace("    permissions:" + ZL
+                                      + "      contents: write" + ZL
+                                      + "      id-token: write",
+                                      "    permissions: read-all"), False)
+
     #  Ein Kommentar, der die falsche Schreibweise ERKLAERT, darf nicht anschlagen -
     #  sonst laesst sich der Grund nicht mehr aufschreiben.
     pruefe_text("Kommentar mit der falschen Schreibweise", "muster.yml",
@@ -335,7 +447,7 @@ def selbsttest():
         fehler.append("ausloeser_block(): falsch abgegrenzt (%r)" % aus[:80])
 
     gesamt = (2 + len(FALSCHER_SELBSTBEZUG) + 1 + 1 + len(PROJEKTWOERTER)
-              + 3 + 1 + 1 + 2 + 1 + 2 + 1)
+              + 3 + 1 + 1 + 2 + 1 + 2 + 1 + 5)
     for f in fehler:
         print("FEHLER: " + f)
     print("%d von %d Pruefungen bestanden." % (gesamt - len(fehler), gesamt))
