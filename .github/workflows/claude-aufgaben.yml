@@ -157,9 +157,27 @@ jobs:
           #  einem Fehler statt mit einer leeren Liste - und der Job waere
           #  tot. Ein fehlendes Label heisst hier aber schlicht: nichts zu
           #  tun. Deshalb auf leer zurueckfallen, nicht abbrechen.
+          #
+          #  isCrossRepository nimmt Pull Requests aus Forks heraus: Ihr Branch
+          #  liegt im Fork, das Modell checkt ihn aus, und der Testlauf fuehrt
+          #  fremden Code aus - auf einem Runner, auf dem GITHUB_TOKEN und
+          #  CLAUDE_CODE_OAUTH_TOKEN liegen. Dass ein Berechtigter einen
+          #  Fork-Pull-Request labelt, ist in einem offenen Projekt ein normaler
+          #  Vorgang und damit die ganze Voraussetzung dafuer (#22).
+          #
+          #  Das Feld NUR beim Pull Request anfordern: "gh issue list" weist es
+          #  mit "Unknown JSON field" ab, und das "|| true" oben machte daraus
+          #  stillschweigend eine leere Liste - der Lauf faende nie wieder ein
+          #  Issue, ohne dass irgendwo etwas rot wuerde.
           nummern() {
+            felder=number
+            filter='.[].number'
+            if [ "$1" = "pr" ]; then
+              felder=number,isCrossRepository
+              filter='.[] | select(.isCrossRepository | not) | .number'
+            fi
             gh "$1" list -R "$GITHUB_REPOSITORY" --label "$2" --state open \
-              --json number --jq '.[].number' 2>/dev/null || true
+              --json "$felder" --jq "$filter" 2>/dev/null || true
           }
           #  Beide Auftragslabel: "Untersuche" ist genauso ein Auftrag an
           #  den Lauf wie "Einarbeiten", nur ein anderer.
@@ -315,9 +333,14 @@ jobs:
             ## 1. Was liegt an?
 
                 gh issue list --label Einarbeiten --state open --json number,title,updatedAt
-                gh pr    list --label Einarbeiten --state open --json number,title,updatedAt
+                gh pr    list --label Einarbeiten --state open --json number,title,updatedAt,isCrossRepository
                 gh issue list --label Untersuche  --state open --json number,title,updatedAt
-                gh pr    list --label Untersuche  --state open --json number,title,updatedAt
+                gh pr    list --label Untersuche  --state open --json number,title,updatedAt,isCrossRepository
+
+            Ein Pull Request mit "isCrossRepository": true kommt aus einem
+            Fork. Den nimmst du NICHT an - weder als Vorgang noch fuer einen
+            "gh pr checkout". Sein Branch traegt fremden Code, und dieser
+            Runner haelt Schreibtoken (#22). Lass ihn liegen und melde ihn.
 
             Findest du wider Erwarten nichts - jemand hat das Label in den
             letzten Sekunden entfernt -, beenden und das melden.
