@@ -81,6 +81,12 @@ jobs:
       - name: Welche Label geschuetzt sind
         run: python .github/skripte/geschuetzt.py --selbsttest
 
+      #  Entscheidet, welche Branches ein Lauf auffrischt. Ein Fehler hier zieht
+      #  einem abhaengigen Branch im schlimmsten Fall die Basis weg - und faellt
+      #  sonst erst auf, wenn die Commits schon fehlen.
+      - name: Veraltete Branches erkennen
+        run: python .github/skripte/veraltete_branches.py --selbsttest
+
       #  Bricht das Blockzitat des Fortschrittskommentars auf, steht die Haelfte des
       #  Standes als Fliesstext im Vorgang - und findet die Marke ihn nicht wieder, legt
       #  jeder Lauf einen neuen an.
