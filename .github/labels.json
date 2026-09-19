@@ -1,16 +1,16 @@
 {
-  "_hinweis": "Katalog aus plugins/reiser-flow/skills/github-issue-workflow/references/konventionen.md, als einzige Quelle fuer .github/skripte/geschuetzt.py und den Abgleich-Workflow label-abgleich.yml (siehe f-reiser/reiser-flow#11 und #54). 'geschuetzt' markiert, was label-waechter.yml vor allen ausser Admin und Maintainer schuetzt. 'vorher' listet fruehere Namen desselben Labels - label_abgleich.py benennt ein so gefundenes Label im Zielprojekt um, statt ein zweites anzulegen. Beschreibungen tragen am Ende '(>wer setzt | <wer liest)'; fehlt eine Seite, ist sie mit der anderen identisch oder ohne Automatik-Bezug.",
+  "_hinweis": "Katalog aus plugins/reiser-flow/skills/github-issue-workflow/references/konventionen.md, als einzige Quelle fuer .github/skripte/geschuetzt.py und den Abgleich-Workflow label-abgleich.yml (siehe f-reiser/reiser-flow#11 und #54). 'geschuetzt' markiert, was label-waechter.yml vor allen ausser Admin und Maintainer schuetzt. 'auftrag' markiert, was einen unbeaufsichtigten Lauf scharf schaltet - einzige Quelle dafuer, siehe f-reiser/reiser-flow#23. 'vorher' listet fruehere Namen desselben Labels - label_abgleich.py benennt ein so gefundenes Label im Zielprojekt um, statt ein zweites anzulegen. Beschreibungen tragen am Ende '(>wer setzt | <wer liest)'; fehlt eine Seite, ist sie mit der anderen identisch oder ohne Automatik-Bezug.",
   "label": [
     { "name": "Dokumentation", "farbe": "0075ca", "beschreibung": "Es geht um Dokumentation jeder Art (>Claude/Nutzer)" },
     { "name": "Duplikat", "farbe": "cfd3d7", "beschreibung": "Dupliziert ein anderes Issue (>Claude/Nutzer)", "vorher": ["Duplicate", "duplicate"] },
-    { "name": "Einarbeiten", "farbe": "0e8a16", "beschreibung": "Durchgesehen, kann umgesetzt werden (>Admin/Maintainer | <Claude/Nutzer)", "geschuetzt": true },
+    { "name": "Einarbeiten", "farbe": "0e8a16", "beschreibung": "Durchgesehen, kann umgesetzt werden (>Admin/Maintainer | <Claude/Nutzer)", "geschuetzt": true, "auftrag": true },
     { "name": "Entscheidung", "farbe": "d93f0b", "beschreibung": "Zwei oder mehr echte Alternativen, der Nutzer muss eine waehlen (>Claude | <Nutzer)" },
     { "name": "Lokale Arbeit", "farbe": "0b6b78", "beschreibung": "Rest geht nur lokal, nicht im unbeaufsichtigten Lauf (>Claude | <Claude-Lokal/Nutzer)" },
     { "name": "Gegenlese", "farbe": "5319e7", "beschreibung": "Nach der Arbeit eine fremde Gegenlese fahren (>Admin/Maintainer | <Claude)", "geschuetzt": true },
     { "name": "GegenleseBefund", "farbe": "b60205", "beschreibung": "Die Gegenlese hat einen bestaetigten Befund ergeben (>Claude | <Claude/Nutzer)" },
     { "name": "Pruefluecke", "farbe": "e4e669", "beschreibung": "Eine Pruefung kann strukturell nicht anschlagen (>Claude | <Claude/Nutzer)" },
     { "name": "Rückfrage", "farbe": "fbca04", "beschreibung": "Die Richtung steht fest, es fehlt nur die Schaerfe (>Claude | <Claude/Nutzer)" },
-    { "name": "Untersuche", "farbe": "1d76db", "beschreibung": "Bug nachstellen und analysieren (>Admin/Maintainer | <Claude)", "geschuetzt": true },
+    { "name": "Untersuche", "farbe": "1d76db", "beschreibung": "Bug nachstellen und analysieren (>Admin/Maintainer | <Claude)", "geschuetzt": true, "auftrag": true },
     { "name": "Verworfen", "farbe": "ffffff", "beschreibung": "Wird nicht umgesetzt, Begruendung siehe Kommentare (>Nutzer | <Claude/Nutzer)", "vorher": ["WontDone"] }
   ],
   "scopes": {

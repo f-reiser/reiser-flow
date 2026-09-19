@@ -104,6 +104,13 @@ jobs:
       - name: Label-Sicherheitsnetz
         run: python .github/skripte/label_sicherheitsnetz.py --selbsttest
 
+      #  Haelt fest, was beim Labeln freigegeben wurde. Der Selbsttest prueft
+      #  beide Seiten der Verdrahtung mit: Legt der Waechter nichts ab oder
+      #  vergleicht der Lauf nicht, wirkt das Skript nicht - und nichts wuerde
+      #  rot.
+      - name: Pruefsumme des Auftrags
+        run: python .github/skripte/pruefsumme.py --selbsttest
+
       #  Bricht das Blockzitat des Fortschrittskommentars auf, steht die Haelfte des
       #  Standes als Fliesstext im Vorgang - und findet die Marke ihn nicht wieder, legt
       #  jeder Lauf einen neuen an.
