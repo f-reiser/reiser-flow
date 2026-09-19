@@ -41,7 +41,9 @@ name: Claude-Aufgaben
 # gar keines - ein Schluessel, den es nicht gibt, macht die ganze Datei ungueltig
 # und legte die Automatik still (f-reiser/reiser-flow#43, Regel 8 in
 # .github/pruefe_workflows.py). Aenderungen an Workflow-Dateien bleiben deshalb
-# Handarbeit; der Lauf meldet sie als Rueckfrage.
+# Handarbeit. Der Lauf bricht darueber nicht ab: Er macht fertig, was ohne sie
+# geht, haengt den fehlenden Diff an den Vorgang und uebergibt ihn mit dem Label
+# "Lokale Arbeit" an den Nutzer (Verfahren im Skill github-issue-workflow).
 #
 # Der Name nennt bewusst nicht ein einzelnes Label: "Einarbeiten" war einmal das
 # einzige, inzwischen sind es mehrere. Laeuft auf GitHub-Runnern und damit
@@ -423,6 +425,11 @@ jobs:
             - Kein Force-Push auf main, kein Direktcommit auf main, keine
               uebersprungenen Tests, kein --no-verify. (--force-with-lease auf dem
               eigenen Feature-Branch nach einem Rebase ist erlaubt und noetig.)
+            - Keine Aenderung an ".github/workflows/*" - das kann dieser Lauf
+              nicht, und er soll es nicht koennen. Braucht ein Vorgang eine,
+              uebergib ihn nach /github-issue-workflow, Abschnitt
+              "Workflow-Dateien kann nur der Nutzer aendern". Nicht erst am
+              abgelehnten Push merken.
             - Kein Release, kein Tag.
             - Keine Admin-Arbeiten: keine Repositories, Schutzregeln,
               Collaborators, Label oder Issue-Typen anlegen oder aendern.

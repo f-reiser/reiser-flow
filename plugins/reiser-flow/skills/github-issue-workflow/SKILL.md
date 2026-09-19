@@ -190,6 +190,37 @@ Setzt der Nutzer **Untersuche**, heißt das: Fehlverhalten nachstellen.
   absichern (testgetrieben), Branch-Strategie beachten.
 - **Duplikat:** `Duplicate` nach `references/konventionen.md`.
 
+## Workflow-Dateien kann nur der Nutzer ändern
+
+Ein unbeaufsichtigter Lauf kann keine Datei unter `.github/workflows/` anfassen.
+GitHub weist jeden Push zurück, der mit dem Token eines Laufs kommt. **Das ist
+Absicht, keine Lücke** — wer Workflows schreiben darf, lässt beliebigen Code laufen.
+Daran wird nichts umgangen; die Entscheidung dazu steht in
+`f-reiser/reiser-flow#44`.
+
+Solche Änderungen gehen ausschließlich lokal, über die Claude-App, vom Nutzer
+gesteuert. Im Dauerbetrieb ist das die Ausnahme: Ein unbeaufsichtigter Lauf pflegt
+vor allem Skills und Projektcode.
+
+Trifft ein Vorgang trotzdem darauf, **brich nicht ab** — übergib ihn:
+
+1. **Alles fertigmachen und pushen, was ohne die Workflow-Datei geht** — Skript,
+   Test, Doku. Ein einziger Commit, der eine Workflow-Datei anfasst, lässt den Push
+   des **ganzen** Branches scheitern; sie gehört deshalb gar nicht erst hinein.
+2. **Den fehlenden Teil als vollständigen Diff in einen Kommentar** am Vorgang.
+   Vollständig heißt: anwendbar, ohne dass ihn jemand rekonstruieren muss.
+3. **Label `Lokale Arbeit` setzen**, Auftragslabel abnehmen.
+4. **Im selben Kommentar** drei Dinge, knapp: warum das Label steht, was noch fehlt,
+   was der Nutzer tun muss.
+
+Der Maßstab für 4: Der lokale Lauf soll den Vorgang **aufnehmen und abschließen
+können, ohne die Sache neu zu durchdringen.** Branch, Stand der Tests, die Stelle, an
+der es hängt — alles, was er sonst wiederherleiten müsste, steht im Kommentar.
+
+Was dort **nicht** hineingehört, ist eine zweite Herleitung des Blockers. `#6`, `#7`
+und `#22` haben denselben dreimal ausführlich beschrieben, jeder Lauf neu und jedes
+Mal bezahlt. Einmal verweisen genügt.
+
 ## Wenn etwas unklar ist
 
 Rate nicht. Welches der beiden Label greift, steht in `references/konventionen.md`.
