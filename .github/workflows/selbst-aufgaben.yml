@@ -1,0 +1,38 @@
+name: Selbst-Aufgaben
+
+# reiser-flow wendet claude-aufgaben.yml auf sich selbst an, damit
+# github-issue-workflow auch hier laufen kann (f-reiser/reiser-flow#11) - sonst
+# genau das Beispiel im Kopf von claude-aufgaben.yml, nur ueber den lokalen
+# Pfad statt einen Tag: Dieser Lauf soll den Stand seines eigenen main
+# ausfuehren, nicht den der letzten Veroeffentlichung.
+#
+# Genehmigt in f-reiser/reiser-flow#18 (Kommentar vom 19.09.2026): Der Lauf
+# tut nichts, wenn kein Auftragslabel gesetzt ist; diese Label schuetzt
+# label-waechter.yml; Aenderungen erreichen main nur per Pull Request; ein
+# Merge bleibt Sache des Nutzers; ein Release loest ausschliesslich er aus.
+#
+# GitHub startet geplante Laeufe nur vom Standardbranch - diese Datei wirkt
+# also erst, wenn sie in main liegt.
+
+on:
+  schedule:
+    - cron: "0 */4 * * *"
+  workflow_dispatch:
+
+jobs:
+  claude-aufgaben:
+    uses: ./.github/workflows/claude-aufgaben.yml
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      id-token: write
+      actions: read
+    with:
+      projektregeln: |
+        Dieses Repository IST reiser-flow - die Skills liegen unter
+        plugins/reiser-flow/skills, die Workflows unter .github/workflows.
+        Eine Aenderung an einem aufrufbaren Workflow (workflow_call) darf
+        keine Projektspezifika kennen; .github/pruefe_workflows.py prueft das.
+    secrets:
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
