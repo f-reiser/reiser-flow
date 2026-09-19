@@ -122,7 +122,10 @@ jobs:
             exit 0
           fi
 
-          gh api --method DELETE "repos/$REPO/issues/$NR/labels/$LABEL"
+          #  Nicht von Hand zusammengesetzt: Ein Labelname darf "/",
+          #  Leerzeichen und "?" enthalten und spraeche dann einen anderen
+          #  Endpunkt an (#30). api_pfad.py kodiert ihn.
+          gh api --method DELETE "$(python3 "$S/api_pfad.py" "$REPO" "$NR" "$LABEL")"
 
           #  Format einfach gequotet: Der Text enthaelt Backticks, und in
           #  doppelten Anfuehrungszeichen wuerde die Shell daraus
