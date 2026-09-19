@@ -100,6 +100,7 @@ eine Quelle, sonst altert dieselbe Regel getrennt.
 |---|---|
 | `claude-aufgaben.yml` | arbeitet nach Zeitplan Vorgänge ab, die ein Auftragslabel tragen — Modellwahl aus den Labels, Branch und Fortschrittskommentar vor dem ersten Token, Rettung angefangener Arbeit |
 | `label-waechter.yml` | nimmt Steuerlabel zurück, die nicht von Admin oder Maintainer kamen, und setzt die Scoped-Label-Exklusivität durch |
+| `label-abgleich.yml` | legt den Label-Katalog aus `.github/labels.json` in einem Projekt an und aktualisiert ihn — nur anlegen und ändern, nie löschen |
 | `pruefung-vermerken.yml` | hängt das Ergebnis der Projektprüfung an den Fortschrittskommentar des Vorgangs |
 | `issue-autoclose.yml` | schließt ein offenes Issue, sobald ein Pull Request auf dessen `issue-<nr>-*`-Branch vom Maintainer-Konto gemergt wurde |
 
