@@ -9,22 +9,24 @@ setzt den Exit-Code entsprechend (0 = geschuetzt, 1 = nicht geschuetzt).
 WARUM KEINE AUFZAEHLUNG DER SCOPED-WERTE
     Modell, Version und Aufwand sind scoped Labels nach dem Vorbild von GitLab
     ("Scope::Wert", erkannt von scoped_labels.py). Ein neuer Aufwandswert (z.B.
-    "Aufwand::ultra") ist damit automatisch geschuetzt, ohne dass diese Datei
-    etwas davon wissen muss - nur die drei Scope-Namen selbst sind eine
-    Pflegestelle, nicht ihre Werte.
+    "Aufwand::ultra") ist damit automatisch geschuetzt, ohne dass labels.json
+    etwas davon wissen muss - nur die drei Scope-Namen selbst sind dort
+    eingetragen, nicht ihre Werte.
+
+WOHER DIE LISTE KOMMT
+    Aus .github/labels.json, damit sie nicht ein zweites Mal hier steht (siehe
+    f-reiser/reiser-flow#11) - labels_lesen.py liest die Datei.
 """
 import sys
 
+import labels_lesen
 import scoped_labels
-
-GESCHUETZTE_SCOPES = ("Modell", "v", "Aufwand")
-EINZELN = ("Einarbeiten", "Untersuche", "Gegenlese")
 
 
 def geschuetzt(label):
-    if label in EINZELN:
+    if label in labels_lesen.geschuetzte_einzelne():
         return True
-    return scoped_labels.scope(label) in GESCHUETZTE_SCOPES
+    return scoped_labels.scope(label) in labels_lesen.geschuetzte_scopes()
 
 
 def selbsttest():

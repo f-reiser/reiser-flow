@@ -1,0 +1,69 @@
+name: Label-Abgleich
+
+# Wiederverwendbarer Workflow (workflow_call). Legt den Label-Katalog aus
+# labels.json in einem Projekt an - Farbe und Beschreibung inklusive. Ein
+# Projekt bindet ihn ein, wenn es den Katalog dieses Repositories uebernehmen
+# will:
+#
+#   on:
+#     push:
+#       paths: [.github/workflows/label-abgleich.yml]
+#     workflow_dispatch:
+#   jobs:
+#     label-abgleich:
+#       uses: f-reiser/reiser-flow/.github/workflows/label-abgleich.yml@<tag>
+#       permissions:            # MUSS der Aufrufer setzen
+#         issues: write
+#
+# NUR ANLEGEN UND AENDERN, NIE LOESCHEN
+# gh label create --force legt an oder aktualisiert Farbe/Beschreibung, loescht
+# aber nie ein Label, das nicht (mehr) im Katalog steht. Ein Projekt kann
+# eigene, zusaetzliche Label fuehren, ohne dass dieser Abgleich sie entfernt -
+# und ein Tippfehler im Katalog kann hier nie ein bestehendes Label kosten.
+# GitHub-Standardlabel, die ein neues Repository mitbringt, raeumt dieser
+# Workflow deshalb bewusst nicht weg; das ist eine einmalige, von Hand
+# gepruefte Aufraeumaktion (f-reiser/reiser-flow#11), keine Automatik.
+#
+# WARUM DER AUFRUFER "paths:" SETZT, NICHT DIESE DATEI
+# Ein aufgerufener Workflow kennt seinen Aufruf-Kontext nicht - "paths:" auf
+# ".github/labels.json" wuerde hier auf das FALSCHE Repository zeigen (das des
+# Aufrufers, nicht dieses hier). Der Aufrufer entscheidet selbst, wann er den
+# Abgleich anstoesst.
+
+on:
+  workflow_call:
+
+permissions:
+  issues: write
+
+jobs:
+  abgleich:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      #  Nur labels.json und die Skripte, aus genau dem Commit, aus dem auch
+      #  diese Datei stammt (job.workflow_sha - im github-Kontext stuende der
+      #  AUFRUFER, siehe .github/pruefe_workflows.py).
+      - uses: actions/checkout@v7
+        with:
+          repository: f-reiser/reiser-flow
+          ref: ${{ job.workflow_sha }}
+          path: _reiser-flow
+          sparse-checkout: |
+            .github/labels.json
+            .github/skripte
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Katalog anlegen und aktualisieren
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          S="$GITHUB_WORKSPACE/_reiser-flow/.github/skripte"
+          python3 "$S/labels_lesen.py" | while IFS=$'\t' read -r NAME FARBE BESCHREIBUNG; do
+            gh label create "$NAME" --color "$FARBE" --description "$BESCHREIBUNG" \
+              --repo "$REPO" --force
+          done
