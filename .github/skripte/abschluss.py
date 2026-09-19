@@ -156,7 +156,9 @@ def zeilen(meldung, skills, ergebnis, bemerkung, lauf_url, wanduhr_s=None):
     if verweigert:
         z += ["", "### Verweigerte Werkzeuge",
               "Der Lauf wollte %d Aufruf(e) machen, die die Sperrliste des "
-              "Workflows nicht erlaubt." % len(verweigert)]
+              "Workflows nicht erlaubt. Die Liste faengt den Fehlgriff ab; "
+              "sie ist keine Grenze gegen einen Lauf, der sie umgehen will "
+              "(f-reiser/reiser-flow#21)." % len(verweigert)]
 
     z += ["", "[Lauf im Actions-Verlauf](%s)" % lauf_url]
     return z
@@ -288,6 +290,20 @@ def selbsttest():
     enthaelt("Ergebnis unbekannt", leer, "unbekannt")
     enthaelt("fehlende Skills sind ein Befund", leer, "Keine gemeldet")
 
+    #  --- Verweigerte Werkzeuge ---
+    #  Der Abschnitt hatte bisher keinen einzigen Testfall - und genau seine
+    #  Formulierung hat der Sperrliste eine Wirkung zugeschrieben, die sie nicht
+    #  hat (f-reiser/reiser-flow#21). Was dort steht, wird deshalb geprueft.
+    mit = NL.join(zeilen(dict(fertig, permission_denials=[{"tool_name": "Bash"},
+                                                          {"tool_name": "Bash"}]),
+                         [], "abgearbeitet", "", "http://l"))
+    enthaelt("Abschnitt erscheint", mit, "### Verweigerte Werkzeuge")
+    enthaelt("Anzahl stimmt", mit, "2 Aufruf(e)")
+    enthaelt("und sagt, was die Liste nicht leistet", mit,
+             "keine Grenze gegen einen Lauf, der sie umgehen will")
+    fehlt_nicht("kein Abschnitt ohne Verweigerungen", voll,
+                "### Verweigerte Werkzeuge")
+
     #  Ersatzmass nur, wenn die echte Dauer fehlt - und benannt als Ersatzmass.
     ersatz = NL.join(zeilen(None, [], None, "", "http://l", wanduhr_s=90))
     enthaelt("Wanduhr springt ein", ersatz, "Uhr des Runners")
@@ -295,7 +311,7 @@ def selbsttest():
     echt = NL.join(zeilen(fertig, [], None, "", "http://l", wanduhr_s=90))
     fehlt_nicht("Wanduhr weicht der echten Dauer", echt, "Uhr des Runners")
 
-    gesamt = 32
+    gesamt = 36
     for f in fehler:
         print("FEHLER: " + f)
     print("%d von %d Pruefungen bestanden." % (gesamt - len(fehler), gesamt))
