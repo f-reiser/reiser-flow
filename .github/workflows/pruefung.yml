@@ -58,6 +58,11 @@ jobs:
       - name: Scoped Labels erkennen
         run: python .github/skripte/scoped_labels.py --selbsttest
 
+      #  Ein Labelname wird Teil eines API-Pfades. Faellt die Kodierung aus,
+      #  spricht der Aufruf ein anderes Objekt an als gemeint (#30).
+      - name: Labelname im API-Pfad
+        run: python .github/skripte/api_pfad.py --selbsttest
+
       #  labels.json ist die einzige Quelle fuer den Label-Katalog UND fuer
       #  geschuetzt.py - ein Fehler hier faellt sonst erst an einer der beiden
       #  Stellen auf, nie an beiden zugleich.

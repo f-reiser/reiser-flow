@@ -20,11 +20,16 @@ Aufruf aus der Shell mit <repo> <nr> <label>; gibt den fertigen Pfad aus, damit
 ein Workflow ihn direkt an "gh api" weiterreichen kann.
 """
 import sys
+from urllib.parse import quote
 
 
 def label_pfad(repo, nr, label):
-    """Pfad zum Entfernen von 'label' an Vorgang 'nr' in 'repo'."""
-    return "repos/%s/issues/%s/labels/%s" % (repo, nr, label)
+    """Pfad zum Entfernen von 'label' an Vorgang 'nr' in 'repo'.
+
+    safe="" ist der Punkt: In der Voreinstellung laesst quote() den
+    Schraegstrich stehen, und genau der ist das Zeichen, um das es geht.
+    """
+    return "repos/%s/issues/%s/labels/%s" % (repo, nr, quote(label, safe=""))
 
 
 def selbsttest():
