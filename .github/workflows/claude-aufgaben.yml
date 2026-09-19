@@ -192,6 +192,17 @@ jobs:
             '.[] | [(.number|tostring), .updatedAt, .title] | @tsv' \
             | nur_offene > kandidaten.txt
 
+          #  Nur fuer Pull Requests: ihr TATSAECHLICHER Branch. Eine PR-Nummer
+          #  ist nicht die eines Issues - "issue-<nr>-<slug>" wuerde sonst
+          #  einen Branch benennen, der mit dem Pull Request nichts zu tun hat
+          #  und ihn auf einen neuen, leeren Branch von main setzt (#33).
+          for label in Einarbeiten Untersuche; do
+            gh pr list -R "$GITHUB_REPOSITORY" --label "$label" --state open \
+              --json number,headRefName \
+              --jq '.[] | [(.number|tostring), .headRefName] | @tsv' \
+              2>/dev/null || true
+          done | sort -u | nur_offene > pr_branches.txt
+
           python3 "$RUNNER_TEMP/reiser-flow/.github/skripte/zuordnung.py"
 
       #  Welches Modell und welcher Aufwand - aus den Labels, nach festen Regeln.
