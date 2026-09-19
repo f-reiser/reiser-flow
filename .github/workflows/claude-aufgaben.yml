@@ -33,15 +33,15 @@ name: Claude-Aufgaben
 # abwarten will - dann antwortet die Actions-API mit 403, und der Lauf hat
 # gearbeitet und gekostet, kann sein Ergebnis aber nicht pruefen.
 #
-# Eine sechste, "workflows: write", steht bewusst NICHT in der Liste oben - sie
-# ist kein Bestandteil der Standardausstattung, sondern eine einzelne, seltene
-# Ausnahme fuer Projekte, deren Automatik ihre EIGENEN Workflow-Dateien aendert.
-# Ohne sie weist GitHub jeden Push auf ".github/workflows/*.yml" zurueck, auch
-# mit "actions: write" - zwei getrennte Berechtigungen (f-reiser/reiser-flow#6).
-# f-reiser/reiser-flow selbst braucht sie, siehe selbst-aufgaben.yml. Ein
-# gewoehnliches Projekt sollte sie nicht in seinen eigenen Aufrufer-Block
-# uebernehmen, denn dieser Workflow haelt sie ohnehin nur bereit - wirksam wird
-# sie erst, wenn der Aufrufer sie zusaetzlich selbst gewaehrt.
+# WAS DIESER LAUF NICHT KANN: WORKFLOW-DATEIEN PUSHEN
+# GitHub weist jeden Push auf ".github/workflows/*.yml" zurueck, der mit dem
+# GITHUB_TOKEN eines Laufs kommt. Dagegen hilft keine Zeile in diesem Block: Die
+# Faehigkeit ist keine Workflow-Berechtigung, sondern haengt am Token selbst.
+# "workflows: write" stand hier einmal und war kein zu schwaches Mittel, sondern
+# gar keines - ein Schluessel, den es nicht gibt, macht die ganze Datei ungueltig
+# und legte die Automatik still (f-reiser/reiser-flow#43, Regel 8 in
+# .github/pruefe_workflows.py). Aenderungen an Workflow-Dateien bleiben deshalb
+# Handarbeit; der Lauf meldet sie als Rueckfrage.
 #
 # Der Name nennt bewusst nicht ein einzelnes Label: "Einarbeiten" war einmal das
 # einzige, inzwischen sind es mehrere. Laeuft auf GitHub-Runnern und damit
@@ -83,15 +83,6 @@ permissions:
   #  Actions-API mit 403 - der Lauf haette dann gearbeitet und bezahlt, koennte
   #  das Ergebnis aber nicht pruefen.
   actions: read
-  #  NICHT Teil der Standardliste oben, die jedes Projekt beim Aufrufer setzt.
-  #  Diese Zeile schaltet nur die Faehigkeit frei, ".github/workflows/*.yml" zu
-  #  aendern - noetig einzig fuer f-reiser/reiser-flow selbst, das mit
-  #  selbst-aufgaben.yml diesen Workflow auf seine eigenen Workflow-Dateien
-  #  anwendet (f-reiser/reiser-flow#6). Ein gewoehnliches Projekt braucht sie
-  #  nicht und sollte sie seinerseits NICHT mitgeben: ohne "workflows: write" im
-  #  eigenen Aufrufer-Block bleibt sie dort wirkungslos (siehe unten, "Dieselbe
-  #  Liste unten schraenkt ein") - Least-Privilege bleibt so der Normalfall.
-  workflows: write
 
 jobs:
   aufgaben:
