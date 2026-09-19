@@ -23,6 +23,7 @@ import subprocess
 import sys
 import tempfile
 
+import api_pfad
 import geschuetzt
 import scoped_labels
 
@@ -36,9 +37,10 @@ def aktuelle_labels(repo, nr):
 
 
 def entfernen(repo, nr, label):
+    #  Der Pfad kommt aus api_pfad.py, weil ein Labelname "/" und Leerzeichen
+    #  enthalten darf und sonst einen anderen Endpunkt anspraeche (#30).
     subprocess.run(
-        ["gh", "api", "--method", "DELETE",
-         "repos/%s/issues/%s/labels/%s" % (repo, nr, label)],
+        ["gh", "api", "--method", "DELETE", api_pfad.label_pfad(repo, nr, label)],
         check=True,
     )
 
