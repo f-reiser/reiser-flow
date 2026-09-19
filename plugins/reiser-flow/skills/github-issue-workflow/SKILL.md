@@ -14,7 +14,10 @@ description: >
   Review antworten", Änderungen nach Feedback nachziehen), bei Research-Aufgaben und
   Untersuchungsberichten (deren Ergebnis ins Issue gehört, nie in einen Pull Request), und
   wenn neue Anforderungen erfasst werden — die laufen in diesen Projekten über Issues,
-  nicht über den Chat. Gilt für jedes Softwareprojekt mit GitHub-Anbindung.
+  nicht über den Chat. Ebenso beim Kurzbefehl „Lokale Arbeit abschließen“ oder
+  „Lokale Arbeiten abschließen“, mit dem der Nutzer lokal die Vorgänge übernimmt,
+  die ein unbeaufsichtigter Lauf nicht zu Ende bringen konnte. Gilt für jedes
+  Softwareprojekt mit GitHub-Anbindung.
 ---
 
 # Issues abarbeiten
@@ -220,6 +223,38 @@ der es hängt — alles, was er sonst wiederherleiten müsste, steht im Kommenta
 Was dort **nicht** hineingehört, ist eine zweite Herleitung des Blockers. `#6`, `#7`
 und `#22` haben denselben dreimal ausführlich beschrieben, jeder Lauf neu und jedes
 Mal bezahlt. Einmal verweisen genügt.
+
+### Kurzbefehl: `Lokale Arbeit abschließen`
+
+Die Gegenrichtung, und nur für einen **lokalen** Lauf. Erkannt werden „Lokale Arbeit
+abschließen" und „Lokale Arbeiten abschließen", mit und ohne Nummer; die genaue
+Schreibweise ist nicht entscheidend.
+
+- **Ohne Nummer** sind alle offenen Vorgänge mit dem Label gemeint, das am längsten
+  unveränderte zuerst.
+- **Mit Nummer** nur die genannten.
+
+Je Vorgang:
+
+1. **Den Übergabekommentar lesen.** Er enthält Branch, Stand und den fehlenden Diff.
+   Das ist die Vorarbeit — sie wird angewendet, nicht wiederholt. Wer hier neu
+   herleitet, bezahlt zweimal für dasselbe.
+2. Branch auschecken und nach `git-branch-strategie` auf `main` rebasen.
+3. Diff anwenden, Tests grün sehen, committen, pushen.
+4. Pull Request anlegen — oder den bestehenden aktualisieren.
+5. **Erst danach `Lokale Arbeit` abnehmen.**
+
+Schritt 5 hängt am Ergebnis, nicht am Versuch: Was rot bleibt oder offen ist, behält
+das Label und wird benannt. Ein Label, das nach einem halben Durchgang fällt, ist
+schlimmer als keins — dann sieht niemand mehr, dass hier noch etwas wartet.
+
+**Das Abnehmen gilt nicht nur für diesen Kurzbefehl.** Wer einen solchen Vorgang
+lokal fertigmacht, nimmt das Label ab, gleich auf welchem Weg er dazu gekommen ist.
+Ein unbeaufsichtigter Lauf nimmt es dagegen **nie** ab — könnte er den Vorgang
+abschließen, stünde es gar nicht da.
+
+Rückmeldung: knapp, eine Zeile je Vorgang. Was der Nutzer selbst angestoßen hat,
+braucht keine Nacherzählung.
 
 ## Wenn etwas unklar ist
 
