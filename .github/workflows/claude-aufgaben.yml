@@ -111,7 +111,7 @@ jobs:
       #  actions/checkout, denn github.repository ist das Repository des
       #  Aufrufers. fetch-depth: 0, weil die Branch-Strategie ein Rebase auf main
       #  verlangt; mit einem flachen Klon fehlt dafuer die Historie.
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           fetch-depth: 0
 
@@ -254,7 +254,7 @@ jobs:
       #  id wieder da: Der letzte Schritt liest die strukturierte Ausgabe.
       - id: claude
         if: steps.vorpruefung.outputs.offen != '0'
-        uses: anthropics/claude-code-action@v1
+        uses: anthropics/claude-code-action@cfc3eb22bfed5c26ef66e3223c982af27e4524de  # v1.0.231
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           #  Modell und Aufwand kommen aus modellwahl.py, gespeist aus den
