@@ -55,6 +55,24 @@ Maintainer (PR #54 vom 13.09.2026) überholt und musste im Sicherheitslauf #19 a
 Abweichung zwischen Doku und Durchsetzung gemeldet werden (#29). Wer die Rollen
 wieder verengen will, ändert `berechtigt.py` — und diese Stelle mit.
 
+### Auftragslabel: die Freigabe gilt einem Stand
+
+`Einarbeiten` und `Untersuche` schalten einen unbeaufsichtigten Lauf scharf. Sie sind
+deshalb eine Freigabe — und zwar der Fassung, die zum Zeitpunkt des Setzens dastand.
+Technisch gepflegt werden sie an genau einer Stelle, `.github/labels.json`.
+
+Daraus folgen zwei Dinge, die im Alltag auffallen:
+
+- **Wer einen freigegebenen Vorgang ändert — Beschreibung bearbeiten, kommentieren,
+  einen Kommentar löschen —, verliert das Auftragslabel.** Das ist kein Fehler und
+  keine Warnung. Ein Vorgang darf sich ändern; nur gilt die Freigabe dann der alten
+  Fassung. Passt der Auftrag weiterhin, wird das Label einfach erneut gesetzt.
+- **Der Lauf arbeitet mit dem freigegebenen Text**, nicht mit dem, der beim Start
+  dasteht. Was in der Zwischenzeit dazukam, erreicht ihn nicht.
+
+Was die Automatik selbst schreibt, zählt dabei nicht als Änderung — sonst nähme sich
+jeder Lauf mit seinem ersten Fortschrittskommentar das Label ab.
+
 ### Steuerlabel: Modell, Version, Aufwand
 
 Sie sagen nichts über den Vorgang, sondern über den **Lauf**, der ihn abarbeitet — was

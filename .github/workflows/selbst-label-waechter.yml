@@ -6,9 +6,13 @@ name: Selbst-Label-Waechter
 
 on:
   issues:
-    types: [labeled]
+    types: [labeled, edited]
+  #  Ohne diese beiden merkt der Waechter nicht, dass sich ein freigegebener
+  #  Vorgang nach der Freigabe geaendert hat (f-reiser/reiser-flow#23).
+  issue_comment:
+    types: [created, edited, deleted]
   pull_request_target:
-    types: [labeled]
+    types: [labeled, edited]
 
 jobs:
   label-waechter:
