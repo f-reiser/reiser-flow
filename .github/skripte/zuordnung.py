@@ -6,6 +6,10 @@ Liest zwei Dateien, die der Workflow-Schritt vorher erzeugt hat:
     nummern.txt     je Zeile die Nummer eines Vorgangs mit Auftragslabel
     branches.txt    je Zeile der Name eines Branches im Repository
     kandidaten.txt  je Zeile "<nr>	<updatedAt>	<titel>" fuer jeden dieser Vorgaenge
+    pr_branches.txt je Zeile "<nr>	<headRefName>" fuer jeden dieser Vorgaenge,
+                    der ein PULL REQUEST ist - seine Nummer ist nicht die eines
+                    Issues, und sein tatsaechlicher Branch heisst in aller Regel
+                    nicht "issue-<nr>-<slug>" (#33)
 
 Schreibt nach GITHUB_OUTPUT:
     offen       Zahl der Vorgaenge mit Auftragslabel
@@ -126,10 +130,14 @@ def slug(titel):
     return wort or "vorgang"
 
 
-def waehle_vorgang(paare, kandidaten):
+def waehle_vorgang(paare, kandidaten, pr_branches=None):
     """(nr, branch) fuer den Vorgang, mit dem dieser Lauf anfaengt - sonst (None, None).
 
     kandidaten: [(nr, updatedAt, titel), ...]
+    pr_branches: {nr: headRefName} fuer offene Pull Requests mit Auftragslabel.
+        Traegt die gewaehlte Nummer dort ein, ist sie eine PR-Nummer, nicht die
+        eines Issues - "issue-<nr>-<slug>" wuerde dann einen Branch benennen,
+        der mit dem Pull Request nichts zu tun hat (#33).
     """
     #  Angefangenes zuerst - und zwar auf SEINEM Branch, sonst waere die ganze
     #  Zuordnung oben umsonst.
@@ -140,6 +148,8 @@ def waehle_vorgang(paare, kandidaten):
     #  Sonst das am laengsten Unveraenderte: "updatedAt" aufsteigend, bei
     #  Gleichstand die kleinere Nummer, damit zwei Laeufe dasselbe waehlen.
     nr, _, titel = sorted(kandidaten, key=lambda k: (k[1], k[0]))[0]
+    if pr_branches and nr in pr_branches:
+        return nr, pr_branches[nr]
     return nr, "issue-%d-%s" % (nr, slug(titel))
 
 
@@ -155,6 +165,17 @@ def lies_kandidaten(pfad):
     return kandidaten
 
 
+def lies_pr_branches(pfad):
+    """{nr: headRefName} - Zeilen ohne Nummer werden uebergangen."""
+    pr_branches = {}
+    for zeile in lies(pfad):
+        teile = zeile.split(chr(9))
+        if len(teile) < 2 or not teile[0].strip().isdigit():
+            continue
+        pr_branches[int(teile[0].strip())] = teile[1].strip()
+    return pr_branches
+
+
 def main():
     nummern = lies("nummern.txt")
     branches = lies("branches.txt")
@@ -162,7 +183,8 @@ def main():
     offen = len({n for n in nummern if n.isdigit()})
     fortsetzen = "; ".join("%d auf %s" % p for p in paare)
 
-    nr, branch = waehle_vorgang(paare, lies_kandidaten("kandidaten.txt"))
+    nr, branch = waehle_vorgang(paare, lies_kandidaten("kandidaten.txt"),
+                                 lies_pr_branches("pr_branches.txt"))
 
     zeilen = ["Vorgaenge mit Auftragslabel: %d" % offen]
     zeilen.append("Dieser Lauf faengt an mit: "
@@ -259,6 +281,17 @@ def selbsttest():
            (31, "issue-31-nutzer-auf-fehlerhafte-bezuege-hinweisen"))
     pruefe("gar nichts", lambda: waehle_vorgang([], []), (None, None))
 
+    #  #33: Traegt die aelteste Nummer ein Auftragslabel als PULL REQUEST,
+    #  ist ihr Branch nicht "issue-<prnr>-<slug>", sondern der tatsaechliche
+    #  Branch des Pull Requests - alles andere legt einen neuen, leeren
+    #  Branch von main an und verliert damit die Arbeit des Pull Requests.
+    pruefe("PR bekommt seinen eigenen Branch, keinen Neuanlage-Namen",
+           lambda: waehle_vorgang([], K, pr_branches={31: "feature/bezuege-fix"}),
+           (31, "feature/bezuege-fix"))
+    pruefe("Issue-Nummer bleibt von pr_branches unberuehrt",
+           lambda: waehle_vorgang([], K, pr_branches={9999: "irrelevant"}),
+           (31, "issue-31-nutzer-auf-fehlerhafte-bezuege-hinweisen"))
+
     #  Bei gleichem Zeitstempel muessen zwei Laeufe dasselbe waehlen.
     pruefe("Gleichstand nach Nummer",
            lambda: waehle_vorgang([], [(9, "T", "b"), (4, "T", "a")])[0], 4)
@@ -290,12 +323,21 @@ def selbsttest():
            [(31, "2026-01-01", "Ein" + chr(9) + "Titel"), (7, "2026-02-02", "Zwei")])
     pruefe("fehlende Datei", lambda: lies_kandidaten(os.path.join(d, "nix")), [])
 
+    #  Einlesen der PR-Branches (#33): "<nr>\t<headRefName>" je Zeile
+    pp = os.path.join(d, "pr.txt")
+    io.open(pp, "w", encoding="utf-8", newline="").write(
+        "31" + chr(9) + "feature/bezuege-fix" + chr(10) +
+        "Muell ohne Nummer" + chr(10))
+    pruefe("PR-Branches einlesen", lambda: lies_pr_branches(pp), {31: "feature/bezuege-fix"})
+    pruefe("fehlende Datei ergibt leeres Mapping",
+           lambda: lies_pr_branches(os.path.join(d, "nix")), {})
+
     #  Leere Eingaben duerfen nicht abstuerzen
     pruefe("gar nichts", lambda: paare([], []), [])
 
     for f in fehler:
         print("FEHLER: " + f)
-    gesamt = 23
+    gesamt = 27
     print("%d von %d Pruefungen bestanden." % (gesamt - len(fehler), gesamt))
     return 1 if fehler else 0
 
