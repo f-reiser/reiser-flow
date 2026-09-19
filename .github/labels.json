@@ -1,15 +1,15 @@
 {
-  "_hinweis": "Katalog aus plugins/reiser-flow/skills/github-issue-workflow/references/konventionen.md, als einzige Quelle fuer .github/skripte/geschuetzt.py und den Abgleich-Workflow label-abgleich.yml (siehe f-reiser/reiser-flow#11). 'geschuetzt' markiert, was label-waechter.yml vor allen ausser Admin und Maintainer schuetzt.",
+  "_hinweis": "Katalog aus plugins/reiser-flow/skills/github-issue-workflow/references/konventionen.md, als einzige Quelle fuer .github/skripte/geschuetzt.py und den Abgleich-Workflow label-abgleich.yml (siehe f-reiser/reiser-flow#11). 'geschuetzt' markiert, was label-waechter.yml vor allen ausser Admin und Maintainer schuetzt; 'auftrag' markiert, was einen unbeaufsichtigten Lauf scharf schaltet - einzige Quelle dafuer, siehe f-reiser/reiser-flow#23.",
   "label": [
     { "name": "Dokumentation", "farbe": "0075ca", "beschreibung": "Es geht um Dokumentation jeder Art" },
     { "name": "Duplicate", "farbe": "cfd3d7", "beschreibung": "Dupliziert ein anderes Issue" },
-    { "name": "Einarbeiten", "farbe": "0e8a16", "beschreibung": "Durchgesehen, kann umgesetzt werden", "geschuetzt": true },
+    { "name": "Einarbeiten", "farbe": "0e8a16", "beschreibung": "Durchgesehen, kann umgesetzt werden", "geschuetzt": true, "auftrag": true },
     { "name": "Entscheidung", "farbe": "d93f0b", "beschreibung": "Zwei oder mehr echte Alternativen, der Nutzer muss eine waehlen" },
     { "name": "Gegenlese", "farbe": "5319e7", "beschreibung": "Fuer diesen Vorgang ist nach der Arbeit eine fremde Gegenlese zu fahren", "geschuetzt": true },
     { "name": "GegenleseBefund", "farbe": "b60205", "beschreibung": "Die Gegenlese hat einen bestaetigten Befund ergeben" },
     { "name": "Pruefluecke", "farbe": "e4e669", "beschreibung": "Eine Pruefung kann strukturell nicht anschlagen" },
     { "name": "Rückfrage", "farbe": "fbca04", "beschreibung": "Die Richtung steht fest, es fehlt nur die Schaerfe" },
-    { "name": "Untersuche", "farbe": "1d76db", "beschreibung": "Bug nachstellen und analysieren", "geschuetzt": true },
+    { "name": "Untersuche", "farbe": "1d76db", "beschreibung": "Bug nachstellen und analysieren", "geschuetzt": true, "auftrag": true },
     { "name": "WontDone", "farbe": "ffffff", "beschreibung": "Wird nicht umgesetzt, braucht Begruendung als Kommentar" }
   ],
   "scopes": {

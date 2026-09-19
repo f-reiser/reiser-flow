@@ -57,11 +57,29 @@ def geschuetzte_scopes(pfad=KATALOG):
     return {s for s, a in lade(pfad).get("scopes", {}).items() if a.get("geschuetzt")}
 
 
+def auftragslabel(pfad=KATALOG):
+    """Die Label, die einen unbeaufsichtigten Lauf ueberhaupt scharf schalten -
+    sortiert, damit zwei Aufrufer dieselbe Reihenfolge sehen.
+
+    EINZIGE Quelle dafuer. Vorher stand die Liste an mehreren Stellen zugleich
+    (Vorpruefung und Prompt in claude-aufgaben.yml, label_sicherheitsnetz.py),
+    und ein drittes Auftragslabel haette an jeder einzelnen nachgezogen werden
+    muessen - wer eine vergisst, baut die naechste Luecke ein
+    (f-reiser/reiser-flow#23).
+
+    Nicht dasselbe wie "geschuetzt": "Gegenlese" ist geschuetzt, aber kein
+    Auftrag - es sagt, WIE gearbeitet wird, nicht DASS.
+    """
+    return sorted(l["name"] for l in lade(pfad).get("label", [])
+                  if l.get("auftrag"))
+
+
 #  ------------------------------------------------------------------ Selbsttest
 
 MUSTER = {
     "label": [
-        {"name": "Einarbeiten", "farbe": "0e8a16", "beschreibung": "x", "geschuetzt": True},
+        {"name": "Einarbeiten", "farbe": "0e8a16", "beschreibung": "x",
+         "geschuetzt": True, "auftrag": True},
         {"name": "Dokumentation", "farbe": "0075ca", "beschreibung": "y"},
     ],
     "scopes": {
@@ -117,6 +135,11 @@ def selbsttest():
         #  geschuetzt, weil der SCOPE es ist.
         pruefe("geschuetzte_scopes()", geschuetzte_scopes(pfad), {"Modell"})
 
+        #  Auftragslabel: was claude-aufgaben.yml ueberhaupt scharf schaltet.
+        #  Nicht dasselbe wie "geschuetzt" - "Gegenlese" ist geschuetzt, aber
+        #  kein Auftrag; es beschreibt, WIE gearbeitet wird, nicht DASS.
+        pruefe("auftragslabel()", auftragslabel(pfad), ["Einarbeiten"])
+
     #  Der echte Katalog dieses Repositories: muss laden und die Label
     #  nennen, auf die geschuetzt.py sich verlaesst (Regression gegen
     #  konventionen.md).
@@ -129,7 +152,20 @@ def selbsttest():
         if scope not in echte_scopes:
             fehler.append("echter Katalog: Scope %r nicht geschuetzt" % scope)
 
-    gesamt = 5 + 3 + 3
+    #  Die Auftragslabel des echten Katalogs. Sie stehen nur noch hier, und
+    #  jede Stelle, die einen Lauf scharf schaltet, holt sie von hier - ein
+    #  drittes Auftragslabel darf nicht an einer Stelle vergessen werden
+    #  koennen (f-reiser/reiser-flow#23).
+    echte_auftraege = auftragslabel(KATALOG)
+    if echte_auftraege != ["Einarbeiten", "Untersuche"]:
+        fehler.append("echter Katalog: Auftragslabel %r" % (echte_auftraege,))
+    #  Ein Auftragslabel MUSS geschuetzt sein: Wer den Lauf scharf schalten
+    #  darf, entscheidet ueber fremde Rechenzeit.
+    for name in echte_auftraege:
+        if name not in echte_geschuetzte:
+            fehler.append("Auftragslabel %r ist nicht geschuetzt" % name)
+
+    gesamt = 5 + 3 + 3 + 1 + 1 + 1
     for f in fehler:
         print("FEHLER: " + f)
     print("%d von %d Pruefungen bestanden." % (gesamt - len(fehler), gesamt))
@@ -137,6 +173,12 @@ def selbsttest():
 
 
 def main():
+    #  Die Auftragslabel einzeln, eine Zeile je Label - so holt die Shell in
+    #  claude-aufgaben.yml und im Waechter dieselbe Liste wie der Python-Code.
+    if "--auftrag" in sys.argv:
+        for name in auftragslabel():
+            print(name)
+        return 0
     for name, farbe, beschreibung, _ in alle():
         print("%s\t%s\t%s" % (name, farbe, beschreibung))
     return 0

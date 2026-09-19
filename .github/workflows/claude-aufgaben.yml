@@ -162,9 +162,16 @@ jobs:
             gh "$1" list -R "$GITHUB_REPOSITORY" --label "$2" --state open \
               --json number --jq '.[].number' 2>/dev/null || true
           }
-          #  Beide Auftragslabel: "Untersuche" ist genauso ein Auftrag an
-          #  den Lauf wie "Einarbeiten", nur ein anderer.
-          for label in Einarbeiten Untersuche; do
+          #  Welche Label einen Lauf scharf schalten, steht nur in labels.json.
+          #  Frueher stand die Liste hier, im Prompt und in
+          #  label_sicherheitsnetz.py zugleich - ein drittes Label haette an
+          #  jeder Stelle nachgezogen werden muessen, und wer eine vergisst,
+          #  baut die naechste Luecke ein (#23).
+          AUFTRAG=$(python3 "$RUNNER_TEMP/reiser-flow/.github/skripte/labels_lesen.py" --auftrag)
+          echo "auftragslabel=$(echo "$AUFTRAG" | paste -sd, -)" >> "$GITHUB_OUTPUT"
+
+          echo "$AUFTRAG" | while IFS= read -r label; do
+            [ -n "$label" ] || continue
             nummern issue "$label"
             nummern pr    "$label"
           done | sort -un > nummern.txt
@@ -203,6 +210,14 @@ jobs:
           if [ -s nummern.txt ]; then
             python3 "$RUNNER_TEMP/reiser-flow/.github/skripte/label_sicherheitsnetz.py"
           fi
+
+          #  Stimmt der Vorgang noch mit dem ueberein, was beim Labeln
+          #  freigegeben wurde? Bricht hier ab, wenn nicht - claude-code wird
+          #  dann gar nicht erst aufgerufen (#23). Legt den geprueften Text je
+          #  Vorgang als "vorgang-<nr>.md" in RUNNER_TEMP ab; der Prompt
+          #  verweist darauf, damit der Lauf den Vorgang nicht ein zweites Mal
+          #  liest und die Luecke zwischen Pruefung und Arbeit offen laesst.
+          python3 "$RUNNER_TEMP/reiser-flow/.github/skripte/pruefsumme.py"
 
           python3 "$RUNNER_TEMP/reiser-flow/.github/skripte/zuordnung.py"
 
@@ -316,23 +331,38 @@ jobs:
             Automatischer Durchgang: Vorgaenge mit einem Auftragslabel
             abarbeiten - Issues wie Pull Requests - in diesem Repository.
 
-            Zwei Label sind Auftraege, und sie bedeuten Verschiedenes:
-            "Einarbeiten" heisst umsetzen, "Untersuche" heisst Fehlverhalten
-            nachstellen und analysieren. Was jeweils zu tun ist, steht im
-            Skill - fuer "Untersuche" im Abschnitt "Bugs untersuchen".
+            Auftragslabel in diesem Repository:
+            ${{ steps.vorpruefung.outputs.auftragslabel }}
+
+            Sie bedeuten Verschiedenes: "Einarbeiten" heisst umsetzen,
+            "Untersuche" heisst Fehlverhalten nachstellen und analysieren.
+            Was jeweils zu tun ist, steht im Skill - fuer "Untersuche" im
+            Abschnitt "Bugs untersuchen".
 
             Ein Schritt davor hat bereits geprueft, dass mindestens einer
             offen ist; du wirst gar nicht erst gestartet, wenn nichts anliegt.
 
-            ## 1. Was liegt an?
+            ## 1. Was liegt an - und woher du es nimmst
 
-                gh issue list --label Einarbeiten --state open --json number,title,updatedAt
-                gh pr    list --label Einarbeiten --state open --json number,title,updatedAt
-                gh issue list --label Untersuche  --state open --json number,title,updatedAt
-                gh pr    list --label Untersuche  --state open --json number,title,updatedAt
+            Die anliegenden Vorgaenge stehen in ${{ runner.temp }}/nummern.txt.
+            Der Text jedes einzelnen liegt daneben als
+            ${{ runner.temp }}/vorgang-<nr>.md: Titel, Beschreibung und alle
+            Kommentare von Menschen, jeder mit Autor und Rolle.
 
-            Findest du wider Erwarten nichts - jemand hat das Label in den
-            letzten Sekunden entfernt -, beenden und das melden.
+            **Nimm die Anforderung aus dieser Datei, nicht aus einem eigenen
+            `gh issue view`.** Der Grund ist nicht Bequemlichkeit: Ein Schritt
+            vor dir hat geprueft, dass der Vorgang noch genau so aussieht wie
+            zu dem Zeitpunkt, als ein Berechtigter ihn freigegeben hat. Was du
+            selbst nachliest, ist wieder ungeprueft - und die Sekunden
+            zwischen Pruefung und Arbeit sind genau die Luecke, die diese
+            Pruefung schliesst.
+
+            Fuer alles andere ist `gh` unveraendert dein Werkzeug: Kommentare
+            schreiben, Label setzen, Pull Requests anlegen, im Code nachsehen.
+            Die Einschraenkung gilt nur fuer die Anforderung selbst.
+
+            Fehlt eine Datei zu einer Nummer, ist dieser Vorgang fuer diesen
+            Durchgang tabu - beenden und melden, nicht ersatzweise lesen.
 
             ## 2. Der Vorgang steht schon fest
 

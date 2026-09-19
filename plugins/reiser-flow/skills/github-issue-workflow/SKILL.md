@@ -113,6 +113,12 @@ Jedes Issue trägt einen Typ. Welche es gibt und wer ihn setzen darf:
 1. **Lesen.** `gh issue view <nr> --comments` — vollständig. Der Auftrag steht oft erst
    in einem Kommentar. Widersprechen sich Beschreibung und Kommentare, ist das selbst
    schon eine Rückfrage.
+
+   **Reicht dir ein unbeaufsichtigter Lauf den Text bereits als Datei an, gilt die
+   Datei** — dann nicht zusätzlich selbst nachlesen. Sie enthält den Stand, den ein
+   Berechtigter freigegeben hat und den ein Schritt vor dir gegen eine Prüfsumme
+   geprüft hat; was du selbst nachliest, ist wieder ungeprüft. Der Workflow sagt dir,
+   ob es so eine Datei gibt.
 2. **Am Code nachprüfen.** Issues altern: Zeilennummern verschieben sich, Funktionen
    werden umbenannt, Probleme sind längst behoben. Ist es erledigt, dokumentiere das und
    schließe es, statt eine Änderung zu erfinden.

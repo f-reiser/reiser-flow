@@ -5,9 +5,11 @@ name: Label-Waechter
 #
 #   on:
 #     issues:
-#       types: [labeled]
+#       types: [labeled, edited]
+#     issue_comment:
+#       types: [created, edited, deleted]
 #     pull_request_target:
-#       types: [labeled]
+#       types: [labeled, edited]
 #   jobs:
 #     label-waechter:
 #       uses: f-reiser/reiser-flow/.github/workflows/label-waechter.yml@<tag>
@@ -36,6 +38,22 @@ name: Label-Waechter
 #
 # Sie nimmt nur zurueck, sie setzt nie. Ein Entfernen loest "unlabeled" aus,
 # worauf hier nichts horcht - eine Schleife ist damit ausgeschlossen.
+#
+# ZWEI AUFTRAEGE, EIN WAECHTER
+# Beim Ereignis "labeled" prueft er die Berechtigung und den Scope wie bisher -
+# und legt, wenn ein AUFTRAGSLABEL bleibt, eine Pruefsumme ueber Titel,
+# Beschreibung und Kommentare am Vorgang ab (pruefsumme.py).
+#
+# Bei jedem anderen Ereignis - Beschreibung geaendert, Kommentar dazu, geaendert
+# oder geloescht - nimmt er alle Auftragslabel wieder ab. Das ist kein Verstoss
+# und keine Warnung: Ein Vorgang darf sich aendern. Nur hat ihn dann niemand
+# mehr in dieser Fassung freigegeben, und genau das sagt das fehlende Label
+# (f-reiser/reiser-flow#23).
+#
+# Ereignisse von Bots loesen das NICHT aus. Der Lauf schreibt selbst an den
+# Vorgang, an dem er arbeitet - Fortschritts- und Abschlusskommentar, und
+# dieser Waechter seinen eigenen Pruefsummen-Kommentar. Ohne diese Ausnahme
+# naehme er sich das Label ab, das er gerade eben bestaetigt hat.
 #
 # GEPRUEFT WIRD DIE BERECHTIGUNG, NICHT DER NAME
 # Frueher stand hier ein Kontoname. Das war doppelt schlecht: Es band eine
@@ -92,6 +110,8 @@ jobs:
       #  Was geschuetzt ist, steht nur in .github/skripte/geschuetzt.py - dort auch
       #  begruendet, warum "GegenleseBefund" trotz Namensnaehe NICHT dazugehoert.
       - name: Label zuruecknehmen, wenn es nicht von Admin oder Maintainer kam
+        id: berechtigung
+        if: github.event.action == 'labeled'
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
@@ -103,8 +123,13 @@ jobs:
         run: |
           S="$GITHUB_WORKSPACE/_reiser-flow/.github/skripte"
 
+          #  Was auch immer unten passiert: Der naechste Schritt muss wissen,
+          #  ob das Label noch da ist.
+          bleibt() { echo "geblieben=ja" >> "$GITHUB_OUTPUT"; }
+
           if ! python3 "$S/geschuetzt.py" "$LABEL"; then
             echo "$LABEL ist nicht geschuetzt - nichts zu tun."
+            bleibt
             exit 0
           fi
 
@@ -119,6 +144,7 @@ jobs:
           #  siehe berechtigt.py fuer die Begruendung und den Selbsttest.
           if python3 "$S/berechtigt.py" "$RECHT"; then
             echo "Berechtigt - Label bleibt."
+            bleibt
             exit 0
           fi
 
@@ -140,9 +166,71 @@ jobs:
       #  Label-Stand selbst frisch und prueft selbst, ob es noch etwas zu tun
       #  gibt (siehe Begruendung dort).
       - name: Geschwister-Label im selben Scope entfernen
+        if: github.event.action == 'labeled'
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           NR: ${{ github.event.issue.number || github.event.pull_request.number }}
           LABEL: ${{ github.event.label.name }}
         run: python3 "$GITHUB_WORKSPACE/_reiser-flow/.github/skripte/scope_ausschluss.py"
+
+      #  Erst jetzt, nach beiden Pruefungen: Die Pruefsumme haelt fest, was
+      #  freigegeben wurde - ein Label, das gleich wieder abgenommen wird, gibt
+      #  nichts frei.
+      #
+      #  Welche Label Auftraege sind, steht nur in labels.json; labels_lesen.py
+      #  gibt sie aus. Ein drittes Auftragslabel wird dort eingetragen und
+      #  wirkt ohne weiteres Zutun hier wie in claude-aufgaben.yml.
+      - name: Pruefsumme des freigegebenen Standes ablegen
+        if: github.event.action == 'labeled' && steps.berechtigung.outputs.geblieben == 'ja'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          NR: ${{ github.event.issue.number || github.event.pull_request.number }}
+          LABEL: ${{ github.event.label.name }}
+        run: |
+          S="$GITHUB_WORKSPACE/_reiser-flow/.github/skripte"
+          if ! python3 "$S/labels_lesen.py" --auftrag | grep -qxF "$LABEL"; then
+            echo "$LABEL ist kein Auftragslabel - keine Pruefsumme noetig."
+            exit 0
+          fi
+          python3 "$S/pruefsumme.py" --schreiben
+
+      #  Der Vorgang hat sich geaendert, nachdem ihn jemand freigegeben hat.
+      #  Erlaubt und normal - aber die Freigabe galt der alten Fassung.
+      #
+      #  Ohne die Bot-Ausnahme naehme dieser Schritt das Label ab, das der
+      #  Schritt darueber gerade bestaetigt hat: Dessen Pruefsummen-Kommentar
+      #  ist selbst ein "issue_comment created".
+      - name: Auftragslabel abnehmen, wenn sich der Vorgang geaendert hat
+        if: github.event.action != 'labeled' && github.event.sender.type != 'Bot'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          NR: ${{ github.event.issue.number || github.event.pull_request.number }}
+          WER: ${{ github.event.sender.login }}
+          WAS: ${{ github.event.action }}
+        run: |
+          S="$GITHUB_WORKSPACE/_reiser-flow/.github/skripte"
+
+          HAT=$(gh api "repos/$REPO/issues/$NR/labels" --jq '.[].name')
+          ENTFERNT=""
+          while IFS= read -r L; do
+            [ -n "$L" ] || continue
+            printf '%s\n' "$HAT" | grep -qxF "$L" || continue
+            gh api --method DELETE "repos/$REPO/issues/$NR/labels/$L"
+            ENTFERNT="$ENTFERNT $L"
+          done <<EOF
+          $(python3 "$S/labels_lesen.py" --auftrag)
+          EOF
+
+          if [ -z "$ENTFERNT" ]; then
+            echo "Kein Auftragslabel gesetzt - nichts abzunehmen."
+            exit 0
+          fi
+
+          printf 'Der Vorgang wurde nach der Freigabe geaendert (`%s` durch `%s`), deshalb sind die Auftragslabel abgenommen:%s\n\nDas ist kein Fehler - ein Vorgang darf sich aendern. Nur gilt die Freigabe dann der alten Fassung. Passt der Auftrag weiterhin, setzt der Nutzer das Label erneut; der Stand wird dabei neu festgehalten.\n' \
+            "$WAS" "$WER" "$ENTFERNT" > "$RUNNER_TEMP/abgenommen.md"
+          gh api --method POST "repos/$REPO/issues/$NR/comments" \
+            -F "body=@$RUNNER_TEMP/abgenommen.md"
+          echo "Abgenommen:$ENTFERNT (#$NR)"
