@@ -28,6 +28,11 @@ jobs:
       issues: write
       id-token: write
       actions: read
+      #  Nur dieser Aufrufer setzt das: sein Lauf pflegt .github/workflows/*.yml
+      #  dieses Repositories selbst mit (f-reiser/reiser-flow#6). Ohne "workflows"
+      #  weist GitHub den Push auf eine Workflow-Datei zurueck, egal wie hoch
+      #  "actions" steht - zwei getrennte Berechtigungen.
+      workflows: write
     with:
       projektregeln: |
         Dieses Repository IST reiser-flow - die Skills liegen unter
