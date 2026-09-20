@@ -1,0 +1,30 @@
+name: Branches auffrischen (dieses Repository)
+
+# reiser-flow wendet branches-auffrischen.yml auf sich selbst an - analog zu
+# selbst-aufgaben.yml, aber unabhaengig von einem Auftragslabel (f-reiser/
+# reiser-flow#7). Ausloeser: jeder Merge eines Pull Requests nach main (dort
+# entsteht das Problem - ein abhaengiger Branch veraltet genau in diesem
+# Moment) sowie einmal naechtlich als Netz.
+#
+# GitHub startet geplante Laeufe nur vom Standardbranch - diese Datei wirkt
+# also erst, wenn sie in main liegt.
+
+on:
+  pull_request:
+    types: [closed]
+  schedule:
+    - cron: "17 2 * * *"
+  workflow_dispatch:
+
+jobs:
+  auffrischen:
+    #  Nur ein tatsaechlicher Merge nach main loest den teuren Teil aus - ein
+    #  geschlossener, nicht gemergter Pull Request veraendert main nicht.
+    if: github.event_name != 'pull_request' || (github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'main')
+    uses: ./.github/workflows/branches-auffrischen.yml
+    permissions:
+      contents: write
+      pull-requests: read
+      id-token: write
+    secrets:
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
