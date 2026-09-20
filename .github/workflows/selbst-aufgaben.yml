@@ -16,7 +16,10 @@ name: Selbst-Aufgaben
 
 on:
   schedule:
-    - cron: "0 */4 * * *"
+    # Nicht zur vollen Stunde: dort ist die Last auf schedule-Events laut
+    # GitHub-Doku am hoechsten, Verzoegerungen und Ausfaelle am
+    # wahrscheinlichsten (f-reiser/reiser-flow#37).
+    - cron: "7 */4 * * *"
   workflow_dispatch:
 
 jobs:
