@@ -69,10 +69,22 @@ jobs:
       - name: Label-Katalog lesen
         run: python .github/skripte/labels_lesen.py --selbsttest
 
+      #  Entscheidet, was label-abgleich.yml in einem Zielprojekt anlegt,
+      #  umbenennt oder loescht. Ein Fehler hier faellt sonst erst in einem
+      #  fremden Projekt auf, das sich den Katalog von hier holt.
+      - name: Label-Abgleich planen
+        run: python .github/skripte/label_abgleich.py --selbsttest
+
       #  Modell und Aufwand entscheiden, was ein Lauf kostet. Ein Fehler in der Zuordnung
       #  von Label zu Modell faellt sonst erst an der Rechnung auf.
       - name: Modellwahl aus den Labels
         run: python .github/skripte/modellwahl.py --selbsttest
+
+      #  Entscheidet, ob ein "Rueckfrage"-Vorgang vom Nutzer oder von Claude
+      #  selbst kommt. Ein Fehler hier faellt sonst erst auf, wenn ein Lauf
+      #  seine eigene offene Frage wieder aufgreift (f-reiser/reiser-flow#53).
+      - name: Rueckfrage-Herkunft erkennen
+        run: python .github/skripte/rueckfrage_filtern.py --selbsttest
 
       #  Entscheidet, wer die Steuerlabel setzen darf. Ein Fehler hier faellt sonst erst
       #  auf, wenn jemand mit zu wenig oder zu viel Recht ein Label setzt - siehe
@@ -97,6 +109,18 @@ jobs:
       #  keine.
       - name: Abschlusskommentar
         run: python .github/skripte/abschluss.py --selbsttest
+
+      #  Entscheidet, welche Branches ein Lauf auffrischt. Ein Fehler hier zieht
+      #  einem abhaengigen Branch im schlimmsten Fall die Basis weg - und faellt
+      #  sonst erst auf, wenn die Commits schon fehlen.
+      - name: Veraltete Branches erkennen
+        run: python .github/skripte/veraltete_branches.py --selbsttest
+
+      #  Fuehrt den Rebase wirklich aus. Ein Fehler hier meldet entweder einen
+      #  Konflikt als Erfolg (halb gepusht) oder startet Claude, wo git allein
+      #  gereicht haette.
+      - name: Branches synchronisieren
+        run: python .github/skripte/branches_synchronisieren.py --selbsttest
 
   #  reiser-flow wendet pruefung-vermerken.yml auf sich selbst an
   #  (f-reiser/reiser-flow#11) - ueber den lokalen Pfad, damit dieser Lauf den

@@ -3,8 +3,7 @@ name: Selbst-Label-Abgleich
 # reiser-flow wendet label-abgleich.yml auf sich selbst an: der Katalog aus
 # .github/labels.json landet damit auch in diesem Repository, sobald er sich
 # aendert (f-reiser/reiser-flow#11) - ueber den lokalen Pfad, damit dieser Lauf
-# den Stand des eigenen main ausfuehrt. GitHub-Standardlabel, die dieser
-# Katalog nicht kennt, raeumt das bewusst nicht weg - siehe label-abgleich.yml.
+# den Stand des eigenen main ausfuehrt.
 
 on:
   push:

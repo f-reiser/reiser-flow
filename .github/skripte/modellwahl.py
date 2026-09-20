@@ -62,6 +62,14 @@ AUFWAND_SCOPE = "Aufwand"
 STANDARD_MODELL = "sonnet"
 STANDARD_AUFWAND = "high"
 
+#  f-reiser/reiser-flow#53: Traegt jeder Vorgang dieses Laufs "Rueckfrage" und
+#  keiner "Einarbeiten"/"Untersuche", ist reine Klaerung ohne Codeaenderung
+#  gemeint - moeglichst billig, solange nichts anderes explizit gesetzt ist.
+#  Eine konkrete Fassung statt des Alias "sonnet": Rueckfragen sollen nicht mit
+#  einer neuen Modellgeneration teurer werden, ohne dass das jemand gewollt hat.
+RUECKFRAGE_MODELL = "claude-sonnet-5"
+RUECKFRAGE_AUFWAND = "low"
+
 
 def lies(pfad):
     """[(nr, [label, ...]), ...]"""
@@ -112,12 +120,28 @@ def _eindeutig(vorgaenge, scope, was):
     return (gesehen.pop() if gesehen else None), warnungen, bool(gesehen)
 
 
+def _nur_rueckfrage(vorgaenge):
+    """True, wenn jeder Vorgang "Rueckfrage" traegt und keiner "Einarbeiten"
+    oder "Untersuche" - dann ist dieser Lauf reine Klaerung, kein echter Auftrag."""
+    if not vorgaenge:
+        return False
+    for _, labels in vorgaenge:
+        if "Einarbeiten" in labels or "Untersuche" in labels:
+            return False
+    return any("Rückfrage" in labels for _, labels in vorgaenge)
+
+
 def waehle(vorgaenge):
     """(modell, aufwand, warnungen)"""
     modell, w1, modell_gesetzt = _eindeutig(vorgaenge, MODELL_SCOPE, "Modell-Label")
     version, w2, _ = _eindeutig(vorgaenge, VERSION_SCOPE, "Versions-Label")
     stufe, w3, _ = _eindeutig(vorgaenge, AUFWAND_SCOPE, "Aufwands-Label")
     warnungen = w1 + w2 + w3
+
+    if _nur_rueckfrage(vorgaenge):
+        standard_modell, standard_aufwand = RUECKFRAGE_MODELL, RUECKFRAGE_AUFWAND
+    else:
+        standard_modell, standard_aufwand = STANDARD_MODELL, STANDARD_AUFWAND
 
     if modell is None:
         #  Regel 5: Version oder Aufwand ohne Modell ist keine halbe Vorgabe, sondern
@@ -127,7 +151,7 @@ def waehle(vorgaenge):
         if (version or stufe) and not modell_gesetzt:
             warnungen.append("Es ist ein Label fuer Version oder Aufwand gesetzt, aber "
                              "keines fuer das Modell. Beide werden verworfen.")
-        return STANDARD_MODELL, STANDARD_AUFWAND, warnungen
+        return standard_modell, standard_aufwand, warnungen
 
     ziel = MODELLE.get((modell, version))
     if ziel is None:
@@ -138,9 +162,9 @@ def waehle(vorgaenge):
         warnungen.append("Unbekanntes Modell oder unbekannte Version: Modell::%s%s. "
                          "Standard wird verwendet."
                          % (modell, " v::" + version if version else ""))
-        return STANDARD_MODELL, STANDARD_AUFWAND, warnungen
+        return standard_modell, standard_aufwand, warnungen
 
-    return ziel, AUFWAND.get(stufe, "high"), warnungen
+    return ziel, AUFWAND.get(stufe, standard_aufwand), warnungen
 
 
 def main():
@@ -190,6 +214,23 @@ def selbsttest():
     pruefe("gar kein Label", v([]), "sonnet", "high")
     pruefe("gar kein Vorgang", [], "sonnet", "high")
     pruefe("nur fremde Label", v(["Einarbeiten", "Gegenlese"]), "sonnet", "high")
+
+    #  #53: nur Rueckfrage(n) offen - billiger Standard statt Regel 1
+    pruefe("nur Rueckfrage", v(["Rückfrage"]), "claude-sonnet-5", "low")
+    pruefe("mehrere reine Rueckfragen",
+           v(["Rückfrage"], ["Rückfrage", "Dokumentation"]), "claude-sonnet-5", "low")
+    #  Explizites Modell-Label bei reiner Rueckfrage: der billige AUFWAND bleibt
+    #  Standard, nur das Modell folgt der Vorgabe.
+    pruefe("Rueckfrage mit explizitem Modell",
+           v(["Rückfrage", "Modell::Opus"]), "opus", "low")
+    pruefe("Rueckfrage mit explizitem Modell und Aufwand",
+           v(["Rückfrage", "Modell::Opus", "Aufwand::maximal"]), "opus", "max")
+    #  Rueckfrage NEBEN einem echten Auftrag im selben Lauf: der teure Standard
+    #  gilt weiter - die billige Regel greift nur, wenn NICHTS anderes offen ist.
+    pruefe("Rueckfrage neben Einarbeiten",
+           v(["Rückfrage"], ["Einarbeiten"]), "sonnet", "high")
+    pruefe("Rueckfrage neben Untersuche",
+           v(["Rückfrage"], ["Untersuche"]), "sonnet", "high")
 
     #  Regel 3: Modell ohne Version - der Alias, damit es nicht veraltet
     pruefe("Opus ohne Version", v(["Modell::Opus"]), "opus", "high")
@@ -275,7 +316,7 @@ def selbsttest():
     if lies(os.path.join(d, "gibtsnicht.txt")) != []:
         fehler.append("fehlende Datei sollte [] geben")
 
-    gesamt = 30
+    gesamt = 36
     for f in fehler:
         print("FEHLER: " + f)
     print("%d von %d Pruefungen bestanden." % (gesamt - len(fehler), gesamt))
