@@ -191,7 +191,7 @@ Setzt der Nutzer **Untersuche**, heißt das: Fehlverhalten nachstellen.
   eines Fixes. Danach `Untersuche` entfernen und `Entscheidung` oder `Rückfrage` setzen.
 - **Minimal und risikoarm:** darfst du direkt beheben — vorher durch einen Test
   absichern (testgetrieben), Branch-Strategie beachten.
-- **Duplikat:** `Duplicate` nach `references/konventionen.md`.
+- **Duplikat:** `Duplikat` nach `references/konventionen.md`.
 
 ## Workflow-Dateien kann nur der Nutzer ändern
 
