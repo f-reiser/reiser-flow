@@ -154,6 +154,63 @@ pushen, sobald etwas Ganzes fertig ist, statt erst bei Schritt 6.**
 bleibt und sein Label behält, wird beim nächsten Durchgang erneut gezogen und verbrennt
 jedes Mal Zeit.
 
+## Wenn sich die Anforderung während der Arbeit grundlegend ändert
+
+Titel und Erstbeschreibung sind das Erste, was jeder liest — auch Monate später, auch
+wenn die Diskussion darunter längst woanders gelandet ist. Ändert eine Rückfrage, ein
+Review-Kommentar oder ein eigener Zwischenstand die Anforderung so grundlegend, dass
+Titel oder Erstbeschreibung nicht mehr zu dem passen, was tatsächlich entsteht, bleiben
+beide nicht stehen — unabhängig davon, ob das Issue oder der Pull Request betroffen ist.
+
+- **Titel:** einfach überschreiben (`gh issue edit <nr> --title "..."` bzw.
+  `gh pr edit <nr> --title "..."`). Er zeigt den aktuellen Stand, keine Historie.
+- **Beschreibung:** nicht ersetzen, **ergänzen**. Die ursprüngliche Fassung bleibt
+  stehen, sichtbar gekennzeichnet, etwa:
+
+  ```markdown
+  > **Ursprüngliche Fassung (überholt, <Datum>):** <alter Wortlaut>
+
+  <aktuelle Beschreibung>
+  ```
+
+  Grund: Kommentare weiter unten beziehen sich auf den alten Wortlaut — wer ihn
+  wegwirft, macht die eigene Diskussion unlesbar.
+
+### Branch und Pull Request folgen der Issue-Nummer, nicht dem Slug
+
+Ein Branch heißt `issue-<nr>-<slug>`. Jede Stelle, die einen Branch einem Issue
+zuordnet — `.github/skripte/zuordnung.py` (`SCHEMA`), `git ls-remote --heads origin
+"issue-<nr>-*"` aus `git-branch-strategie` — matcht nur die **Nummer**, nie den Slug
+danach. Ein Slug, der noch den alten Titel trägt, bricht deshalb nichts; er ist rein
+kosmetisch veraltet. **Ein Branch muss wegen einer geänderten Anforderung nicht
+umbenannt werden, damit „der Rest des Workflows wieder passt" — das passt bereits.**
+
+Kommt eine Umbenennung trotzdem in Frage, weil der alte Slug aktiv in die Irre führt:
+**nicht** über GitHubs eingebautes Umbenennen (UI oder `POST
+/repos/{owner}/{repo}/branches/{branch}/rename`). Es hängt offene Pull Requests nur
+um, wenn der umbenannte Branch deren **Basis** ist — ist er die **Kopf**-Seite (der
+Normalfall bei einem Feature-Branch mit eigenem Pull Request, also fast immer), schließt
+GitHub den Pull Request, statt ihn umzuhängen (GitHub-Doku „Renaming a branch").
+
+Stattdessen, in einem Zug, ohne Zwischenzustand:
+
+```bash
+git fetch origin
+git checkout -b issue-<nr>-<neuer-slug> origin/issue-<nr>-<alter-slug>
+git push -u origin issue-<nr>-<neuer-slug>
+gh pr create --head issue-<nr>-<neuer-slug> --base main \
+  --title "<neuer Titel>" \
+  --body "Ersetzt #<alte-pr-nr> — Branch umbenannt, dort die Vorgeschichte."
+gh pr close <alte-pr-nr> --comment "Ersetzt durch #<neue-pr-nr> — Branch umbenannt."
+git push origin --delete issue-<nr>-<alter-slug>
+```
+
+Der alte Branch fliegt **im selben Zug**, nicht „irgendwann aufgeräumt": Er trägt zum
+Zeitpunkt des Umbenennens exakt dieselben Commits, die über den neuen Branch weiter
+erreichbar bleiben — nichts geht verloren. Eine eigene Aufräumroutine für alte,
+umbenannte Branches ist deshalb unnötig; sie bräuchte es nur, wenn der alte Branch
+liegen bliebe, und genau das vermeidet dieser Ablauf.
+
 ## Research-Aufgaben gehören ins Issue, nicht in den Pull Request
 
 Erkennungsmerkmal: Am Ende steht kein lauffähiges Ergebnis, sondern eine Aussage — ein

@@ -5,7 +5,7 @@ name: Claude-Aufgaben
 # Zeitplan ein:
 #
 #   on:
-#     schedule: [{ cron: "0 */4 * * *" }]
+#     schedule: [{ cron: "7 */4 * * *" }]   # nicht zur vollen Stunde, siehe #37
 #     workflow_dispatch:
 #   jobs:
 #     claude-aufgaben:
