@@ -14,7 +14,10 @@ description: >
   Review antworten", Änderungen nach Feedback nachziehen), bei Research-Aufgaben und
   Untersuchungsberichten (deren Ergebnis ins Issue gehört, nie in einen Pull Request), und
   wenn neue Anforderungen erfasst werden — die laufen in diesen Projekten über Issues,
-  nicht über den Chat. Gilt für jedes Softwareprojekt mit GitHub-Anbindung.
+  nicht über den Chat. Ebenso beim Kurzbefehl „Lokale Arbeit abschließen“ oder
+  „Lokale Arbeiten abschließen“, mit dem der Nutzer lokal die Vorgänge übernimmt,
+  die ein unbeaufsichtigter Lauf nicht zu Ende bringen konnte. Gilt für jedes
+  Softwareprojekt mit GitHub-Anbindung.
 ---
 
 # Issues abarbeiten
@@ -189,6 +192,69 @@ Setzt der Nutzer **Untersuche**, heißt das: Fehlverhalten nachstellen.
 - **Minimal und risikoarm:** darfst du direkt beheben — vorher durch einen Test
   absichern (testgetrieben), Branch-Strategie beachten.
 - **Duplikat:** `Duplicate` nach `references/konventionen.md`.
+
+## Workflow-Dateien kann nur der Nutzer ändern
+
+Ein unbeaufsichtigter Lauf kann keine Datei unter `.github/workflows/` anfassen.
+GitHub weist jeden Push zurück, der mit dem Token eines Laufs kommt. **Das ist
+Absicht, keine Lücke** — wer Workflows schreiben darf, lässt beliebigen Code laufen.
+Daran wird nichts umgangen; die Entscheidung dazu steht in
+`f-reiser/reiser-flow#44`.
+
+Solche Änderungen gehen ausschließlich lokal, über die Claude-App, vom Nutzer
+gesteuert. Im Dauerbetrieb ist das die Ausnahme: Ein unbeaufsichtigter Lauf pflegt
+vor allem Skills und Projektcode.
+
+Trifft ein Vorgang trotzdem darauf, **brich nicht ab** — übergib ihn:
+
+1. **Alles fertigmachen und pushen, was ohne die Workflow-Datei geht** — Skript,
+   Test, Doku. Ein einziger Commit, der eine Workflow-Datei anfasst, lässt den Push
+   des **ganzen** Branches scheitern; sie gehört deshalb gar nicht erst hinein.
+2. **Den fehlenden Teil als vollständigen Diff in einen Kommentar** am Vorgang.
+   Vollständig heißt: anwendbar, ohne dass ihn jemand rekonstruieren muss.
+3. **Label `Lokale Arbeit` setzen**, Auftragslabel abnehmen.
+4. **Im selben Kommentar** drei Dinge, knapp: warum das Label steht, was noch fehlt,
+   was der Nutzer tun muss.
+
+Der Maßstab für 4: Der lokale Lauf soll den Vorgang **aufnehmen und abschließen
+können, ohne die Sache neu zu durchdringen.** Branch, Stand der Tests, die Stelle, an
+der es hängt — alles, was er sonst wiederherleiten müsste, steht im Kommentar.
+
+Was dort **nicht** hineingehört, ist eine zweite Herleitung des Blockers. `#6`, `#7`
+und `#22` haben denselben dreimal ausführlich beschrieben, jeder Lauf neu und jedes
+Mal bezahlt. Einmal verweisen genügt.
+
+### Kurzbefehl: `Lokale Arbeit abschließen`
+
+Die Gegenrichtung, und nur für einen **lokalen** Lauf. Erkannt werden „Lokale Arbeit
+abschließen" und „Lokale Arbeiten abschließen", mit und ohne Nummer; die genaue
+Schreibweise ist nicht entscheidend.
+
+- **Ohne Nummer** sind alle offenen Vorgänge mit dem Label gemeint, das am längsten
+  unveränderte zuerst.
+- **Mit Nummer** nur die genannten.
+
+Je Vorgang:
+
+1. **Den Übergabekommentar lesen.** Er enthält Branch, Stand und den fehlenden Diff.
+   Das ist die Vorarbeit — sie wird angewendet, nicht wiederholt. Wer hier neu
+   herleitet, bezahlt zweimal für dasselbe.
+2. Branch auschecken und nach `git-branch-strategie` auf `main` rebasen.
+3. Diff anwenden, Tests grün sehen, committen, pushen.
+4. Pull Request anlegen — oder den bestehenden aktualisieren.
+5. **Erst danach `Lokale Arbeit` abnehmen.**
+
+Schritt 5 hängt am Ergebnis, nicht am Versuch: Was rot bleibt oder offen ist, behält
+das Label und wird benannt. Ein Label, das nach einem halben Durchgang fällt, ist
+schlimmer als keins — dann sieht niemand mehr, dass hier noch etwas wartet.
+
+**Das Abnehmen gilt nicht nur für diesen Kurzbefehl.** Wer einen solchen Vorgang
+lokal fertigmacht, nimmt das Label ab, gleich auf welchem Weg er dazu gekommen ist.
+Ein unbeaufsichtigter Lauf nimmt es dagegen **nie** ab — könnte er den Vorgang
+abschließen, stünde es gar nicht da.
+
+Rückmeldung: knapp, eine Zeile je Vorgang. Was der Nutzer selbst angestoßen hat,
+braucht keine Nacherzählung.
 
 ## Wenn etwas unklar ist
 

@@ -129,7 +129,19 @@ def selbsttest():
         if scope not in echte_scopes:
             fehler.append("echter Katalog: Scope %r nicht geschuetzt" % scope)
 
-    gesamt = 5 + 3 + 3
+    #  "Lokale Arbeit" vermerkt, dass ein Vorgang ohne den Menschen nicht fertig
+    #  wird (f-reiser/reiser-flow#47). Es MUSS im Katalog stehen, damit
+    #  label-abgleich.yml es in jedem einbindenden Projekt anlegt - und es darf
+    #  NICHT geschuetzt sein: Gesetzt wird es vom unbeaufsichtigten Lauf, und der
+    #  hat kein Maintainer-Recht. Der Waechter naehme es ihm sofort wieder ab.
+    namen = {n for n, _, _, _ in alle(KATALOG)}
+    if "Lokale Arbeit" not in namen:
+        fehler.append("echter Katalog: 'Lokale Arbeit' fehlt")
+    if "Lokale Arbeit" in echte_geschuetzte:
+        fehler.append("'Lokale Arbeit' ist geschuetzt - der Lauf koennte es dann "
+                      "nicht selbst setzen")
+
+    gesamt = 5 + 3 + 3 + 2
     for f in fehler:
         print("FEHLER: " + f)
     print("%d von %d Pruefungen bestanden." % (gesamt - len(fehler), gesamt))
