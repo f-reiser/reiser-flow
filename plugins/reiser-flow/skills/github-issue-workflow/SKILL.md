@@ -193,6 +193,29 @@ Setzt der Nutzer **Untersuche**, heißt das: Fehlverhalten nachstellen.
   absichern (testgetrieben), Branch-Strategie beachten.
 - **Duplikat:** `Duplicate` nach `references/konventionen.md`.
 
+## Eine Rückfrage beantworten
+
+`Rückfrage` funktioniert in zwei Richtungen. Die eine steht unten bei „Wenn etwas
+unklar ist": **du** setzt es, wenn *du* eine Klärung vom Nutzer brauchst. Hier geht es
+um die andere: Setzt der **Nutzer** `Rückfrage` auf ein bestehendes Issue oder einen
+Pull Request, will *er* eine Klärung von dir — zu genau diesem einen Vorgang, nicht zum
+Projekt allgemein.
+
+Anders als bei `Einarbeiten` oder `Untersuche` ist damit **keine** Änderung am Code
+gemeint, kein neues Issue, kein Pull Request:
+
+- **Antworten:** als Kommentar an genau diesem Vorgang — die Frage steht in seinem Text
+  oder in einem Kommentar dort.
+- **Danach `Rückfrage` entfernen.** Die Frage ist beantwortet, das Label hat seinen
+  Zweck erfüllt.
+- **Kein Branch, kein Commit, kein Pull Request** — auch dann nicht, wenn die Antwort
+  eine Codeänderung nahelegt. Legt sie das nahe, wird daraus ein **neues Issue**, keine
+  stille Zusatzänderung an diesem Vorgang.
+
+`entfernt` liegt in beiden Richtungen bei dir: Du nimmst dein eigenes `Rückfrage`
+zurück, sobald der Nutzer geantwortet hat (unten), und du nimmst seines zurück, sobald
+du seine Frage beantwortet hast (hier).
+
 ## Workflow-Dateien kann nur der Nutzer ändern
 
 Ein unbeaufsichtigter Lauf kann keine Datei unter `.github/workflows/` anfassen.

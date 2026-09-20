@@ -29,7 +29,7 @@ Die Schreibweise ist bindend, `gh label list` zeigt die gültige Fassung.
 | `GegenleseBefund` | die Gegenlese hat einen bestätigten Befund ergeben | **nur Claude** | beide |
 | `Lokale Arbeit` | der Rest des Vorgangs geht nur lokal — ein unbeaufsichtigter Lauf kann ihn nicht zu Ende bringen | **nur Claude** | beide |
 | `Pruefluecke` | eine Prüfung kann strukturell nicht anschlagen | **nur Claude** | beide |
-| `Rückfrage` | die Richtung steht fest, es fehlt nur die Schärfe | **nur Claude** | beide |
+| `Rückfrage` | Klärung noch offen — von Claude an den Nutzer oder umgekehrt, siehe `SKILL.md` „Eine Rückfrage beantworten" | Claude, Nutzer | beide |
 | `Untersuche` | Bug nachstellen; Verfahren in `SKILL.md`, „Bugs untersuchen" | **nur Nutzer** | Claude nach der Analyse |
 | `WontDone` | wird nicht umgesetzt, braucht Begründung als Kommentar | **nur Nutzer** | Nutzer |
 
