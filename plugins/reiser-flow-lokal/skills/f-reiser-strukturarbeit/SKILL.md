@@ -1,21 +1,23 @@
 ---
 name: f-reiser-strukturarbeit
 description: >
-  NUR relevant für Softwareprojekte der GitHub-Organisation f-reiser (aktuell:
-  Stoffverteilungsplan, reiser-flow) und NUR in einer Sitzung am eigenen Rechner — bei
-  jedem Projekt ohne Bezug zu dieser Organisation ignorieren. Für f-reiser-Projekte:
-  Kontext für Strukturaufgaben, die direkt im Chat statt über den Issue-Workflow erledigt
+  NUR relevant für Softwareprojekte der eigenen GitHub-Organisation — der, die auch
+  reiser-flow selbst betreibt — und NUR in einer Sitzung am eigenen Rechner; bei jedem
+  Projekt ohne Bezug zu dieser Organisation ignorieren. Welche Organisation das konkret
+  ist, steht nicht hier (öffentliches Repository), sondern ergibt sich aus dem
+  Repository, in dem gerade gearbeitet wird. Für Projekte dieser Organisation: Kontext
+  für Strukturaufgaben, die direkt im Chat statt über den Issue-Workflow erledigt
   werden — Skillset erweitern oder korrigieren, projektübergreifende Workflows anpassen,
   Projektstruktur ändern. Ergänzt die Skills aus reiser-flow um das, was dort nicht
   hingehört, weil es nur lokal gilt: wie sich eine Chat-Sitzung von einer Sitzung in
   GitHub Actions unterscheidet, welches der angemeldeten GitHub-Konten wofür zuständig
   ist, und welche Befehle ein Release auslösen. Nutze diesen Skill, sobald in einem
-  f-reiser-Projekt eine Strukturaufgabe ansteht statt einer Fachaufgabe an einem
-  einzelnen Repository, wenn zu klären ist, welches Konto oder Repository gemeint ist,
-  und bei jedem Release-Befehl des Nutzers.
+  Projekt dieser Organisation eine Strukturaufgabe ansteht statt einer Fachaufgabe an
+  einem einzelnen Repository, wenn zu klären ist, welches Konto oder Repository gemeint
+  ist, und bei jedem Release-Befehl des Nutzers.
 ---
 
-# Strukturarbeit — nur Organisation f-reiser, nur lokal
+# Strukturarbeit — nur die eigene Organisation, nur lokal
 
 ## Zwei Schranken, bevor irgendetwas hier gilt
 
@@ -27,16 +29,20 @@ Workflow-Datei: melden, und nichts aus diesem Skill anwenden.
 
 Warum das zwei Plugins sind und keine zwei Repositories: `README.md` im Wurzelverzeichnis.
 
-**2. Nur Organisation f-reiser.** Bei jedem anderen Projekt — auch bei anderen eigenen
-Repositories außerhalb dieser Organisation — sagt dieser Skill nichts Sinnvolles. Vor der
-Anwendung kurz prüfen: Läuft die Arbeit in einem der unten genannten Repositories, oder an
-etwas, das erkennbar dafür entstehen soll?
+**2. Nur die eigene Organisation.** Bei jedem anderen Projekt — auch bei anderen eigenen
+Repositories außerhalb dieser Organisation — sagt dieser Skill nichts Sinnvolles. Welche
+das ist, steht absichtlich nirgends in diesem öffentlichen Repository (siehe „Welches
+Konto wofür" unten für dieselbe Regel bei Kontennamen) — vor der Anwendung kurz per
+`gh repo view --json owner --jq .owner.login` im aktuellen Projekt prüfen, ob es zu
+derselben Organisation gehört wie `reiser-flow` selbst, oder ob erkennbar etwas dafür
+entstehen soll.
 
 ## Wofür dieser Skill sonst da ist
 
 Für Aufgaben, die keine Fachaufgabe an EINEM Projekt sind, sondern die Struktur betreffen,
-die mehrere f-reiser-Projekte teilen: das Skillset erweitern oder korrigieren, Workflows
-projektübergreifend anpassen, eine Projektstruktur ändern. Solche Aufgaben laufen bewusst
+die mehrere Projekte der eigenen Organisation teilen: das Skillset erweitern oder
+korrigieren, Workflows projektübergreifend anpassen, eine Projektstruktur ändern. Solche
+Aufgaben laufen bewusst
 **direkt über den Chat**, nicht über den Issue-Workflow mit Label „Einarbeiten"
 (`github-issue-workflow`) — das geht schneller, und es ist nicht die Art Aufgabe, die an
 ein einzelnes Repository gebunden ist.
@@ -90,21 +96,22 @@ verletzt — dann fragen statt raten.
 
 ## Repositories in der Organisation
 
-Organisation: **f-reiser**. Aktuelle Liste immer über
+Welche Organisation das ist und welche Repositories dazugehören, ist eine lokale
+Tatsache wie die Kontennamen oben — deshalb nicht hier aufgezählt, sondern immer über
+eine Abfrage ermittelt:
 
 ```bash
-gh repo list f-reiser --limit 100
+gh repo view --json owner --jq .owner.login    # Organisation des aktuellen Projekts
+gh repo list <Organisation> --limit 100        # ihre Repositories
 ```
 
-- **Stoffverteilungsplan** — das laufende Projekt, an dem alle Strukturen (Skills,
-  Workflows) entstehen und erprobt werden, bevor sie verallgemeinert werden.
-- **reiser-flow** — verwaltet die Plugins `reiser-flow` (überall geladen) und
-  `reiser-flow-lokal` (nur lokal, dieses hier). Öffentliches Repository — deshalb keine
-  Kontennamen, Schulnamen oder sonstigen personenbezogenen Daten hineinschreiben (siehe
-  `repo-hygiene`).
-- **claude-skills** — stillgelegt und archiviert. Der Vorgänger von `reiser-flow`; der
-  Name passte nicht mehr, seit dort auch Workflows liegen. Nur noch als Verweisziel für
-  ältere Links da: dort wird nichts mehr entwickelt.
+**`reiser-flow` gehört immer dazu**, unabhängig von der konkreten Organisation: Es
+verwaltet die Plugins `reiser-flow` (überall geladen) und `reiser-flow-lokal` (nur
+lokal, dieses hier). Öffentliches Repository — deshalb keine Kontennamen, Projektnamen
+oder sonstigen personenbezogenen Daten anderer Projekte der Organisation
+hineinschreiben (siehe `repo-hygiene`). Notizen zu den übrigen Repositories der eigenen
+Organisation gehören ins eigene, nicht öffentliche Gedächtnis (Memory), nicht in diese
+Datei.
 
 ## Wenn eine Strukturaufgabe die Skills selbst betrifft
 
