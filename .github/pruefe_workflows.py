@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Prueft die Workflows dieses Repositories auf fuenf Zusagen, die sonst niemand
+"""Prueft die Workflows dieses Repositories auf sieben Zusagen, die sonst niemand
 haelt - und die, wenn sie brechen, in FREMDEN Projekten wirken.
 
     1. Selbstbezug   Ein aufrufbarer Workflow bestimmt seinen eigenen Stand ueber
@@ -10,6 +10,8 @@ haelt - und die, wenn sie brechen, in FREMDEN Projekten wirken.
     3. Fremder Code  Ein Workflow an pull_request_target checkt keinen "ref:" aus.
     4. Projektfrei   Ein aufrufbarer Workflow nennt keine Projektspezifika.
     5. Ausdruecke    Kein "${{ ... }}" im on:-Abschnitt.
+    6. Anpinnung     Jede fremde Action haengt an einem Commit-SHA, nie an einem
+                     verschiebbaren Tag - und nennt die Version als Kommentar.
     8. Berechtigung  Ein "permissions:"-Block nennt nur Scopes, die es gibt.
 
 WARUM 1 UND 2 KEINE STILFRAGE SIND
@@ -32,6 +34,20 @@ WARUM 3 HIER STEHT
     Bisher war das nur eine Zeile Prosa in einer Checkliste (Abschnitt A in
     f-reiser/reiser-flow#12) - Prosa haelt niemanden auf.
 
+WARUM 6 HIER STEHT
+    Ein Tag wie "@v7" oder "@v1" ist verschiebbar. Wer ihn verschiebt - ein
+    uebernommenes Upstream-Konto, ein kompromittiertes Repository -, fuehrt beim
+    naechsten Lauf eigenen Code in JEDEM einbindenden Projekt aus, auf einem Runner
+    mit Schreibtoken; anthropics/claude-code-action bekommt zusaetzlich das
+    CLAUDE_CODE_OAUTH_TOKEN. Genau dieses Prinzip begruendet weiter oben die strenge
+    Verriegelung des EIGENEN Standes (Regel 2) - es gilt fuer fremde Actions nicht
+    weniger (f-reiser/reiser-flow#24).
+
+    Die Versionsangabe als Kommentar dahinter ist kein Schmuck: Ein nackter SHA sagt
+    nicht, wie alt er ist. Ohne sie faellt niemandem auf, dass eine Action zwei Jahre
+    nicht nachgezogen wurde - und Anpinnen ohne Nachziehen tauscht ein Risiko nur
+    gegen ein anderes.
+
 WARUM 8 SO TEUER WAR
     Die Scopes von GITHUB_TOKEN sind eine geschlossene Liste. Steht in einem
     "permissions:"-Block etwas, das nicht dazugehoert, weist GitHub die GANZE Datei
@@ -46,9 +62,9 @@ WARUM 8 SO TEUER WAR
     Berechtigung nicht. Sie haengt am Token selbst - ein Personal Access Token kann
     sie tragen, GITHUB_TOKEN nicht.
 
-    Die Nummern 6 und 7 sind ausgelassen: Sie gehoeren zu Regeln, die noch als Pull
-    Request offen sind (f-reiser/reiser-flow#24 und #22). So passen alle drei in
-    beliebiger Reihenfolge nach main, ohne sich gegenseitig umzunummerieren.
+    Die Nummer 7 ist ausgelassen: sie gehoert zum Ausschluss von Fork-Pull-Requests,
+    der noch als Pull Request zu f-reiser/reiser-flow#22 offen ist. So passt sie in
+    beliebiger Reihenfolge nach main, ohne die anderen umzunummerieren.
 
 Aufruf ohne Argument prueft dieses Repository, mit --selbsttest die Pruefung selbst.
 """
@@ -81,6 +97,20 @@ HOLT_DIESES_REPOSITORY = re.compile(
 PROJEKTWOERTER = ("Makros", ".bas", ".xlsm", "openpyxl", "cp1252",
                   "Stoffverteilungsplan", "pruefe_alles")
 
+
+def projektwort_trifft(wort, text):
+    """True, wenn 'wort' in 'text' vorkommt - fuer eine Dateiendung (fuehrender
+    Punkt) nur, wenn danach kein weiterer Wortbuchstabe folgt.
+
+    Ohne diese Grenze faengt ".bas" auch ".baseRefName" - denselben vier
+    Zeichen in einem jq-Feldzugriff, kein VBA-Modul (f-reiser/reiser-flow#7).
+    Woerter ohne fuehrenden Punkt sind Bezeichner, kein Suffix, und bleiben
+    eine einfache Teilstring-Suche.
+    """
+    if not wort.startswith("."):
+        return wort in text
+    return re.search(re.escape(wort) + r"(?![A-Za-z0-9_])", text) is not None
+
 #  Die Scopes, die GitHub in einem "permissions:"-Block kennt. Geschlossene Liste:
 #  Was hier fehlt, macht die ganze Datei ungueltig. Kommt ein neuer Scope dazu,
 #  gehoert er hierher - eine Zeile, gegen einen Ausfall des gesamten Repositories.
@@ -95,6 +125,20 @@ EINTRAG = re.compile(r"^(\s*)([A-Za-z][A-Za-z0-9-]*)\s*:")
 
 #  Eine Zeile, die einen Schritt beginnt.
 SCHRITT_BEGINN = re.compile(r"^\s*-\s+(uses|name|id|run|if)\s*:")
+
+#  Ein "uses:" mit Ref: "owner/repo[/pfad]@ref", der Rest der Zeile getrennt, weil
+#  dort die Versionsangabe steht. Ein lokaler Aufruf ("./.github/workflows/x.yml")
+#  traegt kein "@" und faellt schon hier heraus.
+USES_MIT_REF = re.compile(
+    r"^\s*-?\s*uses\s*:\s*['\"]?(?P<quelle>[^\s@'\"]+)@(?P<ref>[^\s'\"]+)['\"]?"
+    r"(?P<rest>.*)$")
+
+#  Ein voller Commit-SHA - nur der ist unverschiebbar. Ein gekuerzter reicht nicht:
+#  GitHub loest ihn gar nicht erst auf, und kollisionsfest waere er auch nicht.
+VOLLER_SHA = re.compile(r"^[0-9a-f]{40}$")
+
+#  Die Versionsangabe hinter dem SHA - irgendein Kommentar, der eine Ziffer nennt.
+VERSION_IM_KOMMENTAR = re.compile(r"#.*\d")
 
 ZL = chr(10)
 
@@ -188,6 +232,34 @@ def ausloeser_block(text):
     return anfang + 1, ZL.join(zeilen[anfang:])
 
 
+def anpinnung(text):
+    """Befunde zu fremden Actions - Liste (Zeilennummer, Meldung).
+
+    Bewusst zeilenweise und nicht ueber schritte(): So stimmt die Zeilennummer
+    genau, und ein "uses:" auf Job-Ebene (workflow_call) wird mitgeprueft, obwohl
+    es kein Schritt ist.
+    """
+    gefunden = []
+    for i, z in enumerate(text.split(ZL), start=1):
+        m = USES_MIT_REF.match(z)
+        if not m:
+            continue
+        quelle, ref, rest = m.group("quelle"), m.group("ref"), m.group("rest")
+        #  Aus diesem Repository selbst - sein Stand ist ueber Regel 1 und 2
+        #  verriegelt, nicht ueber einen SHA an dieser Stelle.
+        if quelle.startswith("."):
+            continue
+        if not VOLLER_SHA.match(ref):
+            gefunden.append((i, "%s@%s haengt an einem verschiebbaren Ref - auf den "
+                                "vollen Commit-SHA pinnen (Version als Kommentar "
+                                "dahinter)" % (quelle, ref)))
+        elif not VERSION_IM_KOMMENTAR.search(rest):
+            gefunden.append((i, "%s ist auf einen SHA gepinnt, nennt aber keine "
+                                "Version - ohne sie sieht niemand, wie alt der "
+                                "Stand ist" % quelle))
+    return gefunden
+
+
 def befunde(name, roh):
     """Liste der Befunde zu einem Workflow - leer heisst gruen."""
     text = ohne_kommentare(roh)
@@ -209,6 +281,9 @@ def befunde(name, roh):
                      "unbekannter Schluessel macht die ganze Datei ungueltig, "
                      "und der Lauf meldet dann nur 'workflow file issue'" % scope)
 
+    for zeile, was in anpinnung(text):
+        melde(zeile, was)
+
     zeile, aus = ausloeser_block(text)
     if "${{" in aus:
         melde(zeile, "Ausdruck ${{ ... }} im on:-Abschnitt - dort gibt es keine "
@@ -228,7 +303,7 @@ def befunde(name, roh):
                       % (DIESES_REPOSITORY, RICHTIGER_SELBSTBEZUG))
 
             for wort in PROJEKTWOERTER:
-                if wort in block:
+                if projektwort_trifft(wort, block):
                     melde(zeile, "projektspezifisch: %r gehoert nicht in einen "
                                  "aufrufbaren Workflow" % wort)
 
@@ -257,6 +332,11 @@ def pruefe(wurzel=WURZEL):
 
 #  ----------------------------------------------------------------- Selbsttest
 
+#  Wie eine fremde Action in den Mustern aussieht: voller Commit-SHA, Version als
+#  Kommentar dahinter. Der Wert ist echt (actions/checkout v7.0.1), aber fuer die
+#  Pruefung beliebig - sie sieht nur die Form.
+CHECKOUT = "      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1"
+
 #  Ein aufrufbarer Workflow, wie er sein soll. Die Mutationen unten aendern je eine
 #  Stelle daran - schlaegt danach keine Pruefung an, prueft sie nichts.
 MUSTER = """name: Muster
@@ -269,7 +349,7 @@ jobs:
   tun:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           repository: f-reiser/reiser-flow
           ref: ${{ job.workflow_sha }}
@@ -302,7 +382,7 @@ jobs:
   tun:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       - name: Etwas tun
         run: echo hallo
 """
@@ -335,8 +415,8 @@ def selbsttest():
     #  Mutation 3: fremder Fork-Code auf einen schreibenden Runner.
     pruefe_text("Mutation ref bei pull_request_target", "fork.yml",
                 FORK_MUSTER.replace(
-                    "      - uses: actions/checkout@v7",
-                    "      - uses: actions/checkout@v7" + ZL
+                    CHECKOUT,
+                    CHECKOUT + ZL
                     + "        with:" + ZL
                     + "          ref: ${{ github.event.pull_request.head.sha }}"),
                 True)
@@ -345,6 +425,14 @@ def selbsttest():
     for wort in PROJEKTWOERTER:
         pruefe_text("Mutation Projektwort %r" % wort, "muster.yml",
                     MUSTER.replace("run: python3", "run: %s python3" % wort), True)
+
+    #  Gegenprobe zu 4: ".bas" ist eine Dateiendung und darf nur als solche
+    #  anschlagen. ".baseRefName" (ein jq-Feldzugriff auf baseRefName) traegt
+    #  dieselben vier Zeichen, ist aber kein VBA-Modul - ohne Wortgrenze nach
+    #  dem Treffer sprang Regel 4 hier faelschlich an (f-reiser/reiser-flow#7).
+    pruefe_text("Projektwort '.bas' ist keine Dateiendung hier", "muster.yml",
+                MUSTER.replace("run: python3",
+                               "run: echo .baseRefName python3"), False)
 
     #  Gegenprobe zu 1/2/4: In einem NICHT aufrufbaren Workflow ist all das erlaubt -
     #  dort meint github.workflow_ref die Datei selbst, und die eigene CI darf ihr
@@ -426,6 +514,35 @@ def selbsttest():
                     + ZL + "        shell: bash" + ZL + "        #x: python3"),
                 False)
 
+    #  Mutation 6: der verschiebbare Tag statt des SHA - genau der Zustand, in dem
+    #  dieses Repository bis f-reiser/reiser-flow#24 war.
+    pruefe_text("Mutation Action an @v7 statt am SHA", "muster.yml",
+                MUSTER.replace(CHECKOUT, "      - uses: actions/checkout@v7"), True)
+    pruefe_text("Mutation Action an einem Branch", "muster.yml",
+                MUSTER.replace(CHECKOUT, "      - uses: actions/checkout@main"), True)
+
+    #  Ein gekuerzter SHA sieht aus wie eine Anpinnung, ist aber keine: GitHub
+    #  loest ihn nicht auf, und eindeutig waere er auch nicht.
+    pruefe_text("Mutation gekuerzter SHA", "muster.yml",
+                MUSTER.replace(CHECKOUT,
+                               "      - uses: actions/checkout@3d3c42e"), True)
+
+    #  Mutation 7: gepinnt, aber ohne Versionsangabe - dann sieht niemand mehr,
+    #  wie alt der Stand ist, und die Anpinnung altert unbemerkt.
+    pruefe_text("Mutation SHA ohne Versionskommentar", "muster.yml",
+                MUSTER.replace("  # v7.0.1", ""), True)
+
+    #  Gegenprobe: ein Aufruf aus diesem Repository selbst traegt keinen SHA - sein
+    #  Stand haengt an Regel 1 und 2, nicht an dieser Zeile.
+    pruefe_text("lokaler Workflow-Aufruf ohne SHA ist erlaubt", "eigen.yml",
+                eigener.replace(CHECKOUT,
+                                "      - uses: ./.github/workflows/teil.yml"), False)
+
+    #  Gegenprobe: eine andere Schreibweise der Versionsangabe genuegt ebenfalls -
+    #  geprueft wird, DASS eine dasteht, nicht wie sie formatiert ist.
+    pruefe_text("Versionsangabe in anderer Schreibweise", "muster.yml",
+                MUSTER.replace("  # v7.0.1", "  # Stand 7.0.1 vom 12.09.2026"), False)
+
     #  Mutation 5: ein Ausdruck im on:-Abschnitt. Genau der Fehler vom 18.09.2026,
     #  als Beispiel in der description eines Eingabewertes.
     pruefe_text("Mutation Ausdruck in der description", "muster.yml",
@@ -446,8 +563,8 @@ def selbsttest():
     if "runs-on" in aus or "workflow_call" not in aus:
         fehler.append("ausloeser_block(): falsch abgegrenzt (%r)" % aus[:80])
 
-    gesamt = (2 + len(FALSCHER_SELBSTBEZUG) + 1 + 1 + len(PROJEKTWOERTER)
-              + 3 + 1 + 1 + 2 + 1 + 2 + 1 + 5)
+    gesamt = (2 + len(FALSCHER_SELBSTBEZUG) + 1 + 1 + len(PROJEKTWOERTER) + 1
+              + 3 + 1 + 1 + 2 + 1 + 2 + 1 + 5 + 6)
     for f in fehler:
         print("FEHLER: " + f)
     print("%d von %d Pruefungen bestanden." % (gesamt - len(fehler), gesamt))

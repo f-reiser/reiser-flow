@@ -22,15 +22,16 @@ Die Schreibweise ist bindend, `gh label list` zeigt die gültige Fassung.
 | Label | Bedeutung | setzt | entfernt |
 |---|---|---|---|
 | `Dokumentation` | es geht um Dokumentation jeder Art | Claude, Nutzer | beide |
-| `Duplicate` | dupliziert ein anderes Issue | Claude, Nutzer | beide |
+| `Duplikat` | dupliziert ein anderes Issue | Claude, Nutzer | beide |
 | `Einarbeiten` | durchgesehen, kann umgesetzt werden | **nur Nutzer** | beide |
 | `Entscheidung` | zwei oder mehr echte Alternativen, der Nutzer muss eine wählen | **nur Claude** | beide |
 | `Gegenlese` | für diesen Vorgang ist nach der Arbeit eine fremde Gegenlese zu fahren | **nur Nutzer** | **nur Claude**, wenn sie gelaufen ist |
 | `GegenleseBefund` | die Gegenlese hat einen bestätigten Befund ergeben | **nur Claude** | beide |
+| `Lokale Arbeit` | der Rest des Vorgangs geht nur lokal — ein unbeaufsichtigter Lauf kann ihn nicht zu Ende bringen | **nur Claude** | beide |
 | `Pruefluecke` | eine Prüfung kann strukturell nicht anschlagen | **nur Claude** | beide |
-| `Rückfrage` | die Richtung steht fest, es fehlt nur die Schärfe | **nur Claude** | beide |
+| `Rückfrage` | Klärung noch offen — von Claude an den Nutzer oder umgekehrt, siehe `SKILL.md` „Eine Rückfrage beantworten" | Claude, Nutzer | beide |
 | `Untersuche` | Bug nachstellen; Verfahren in `SKILL.md`, „Bugs untersuchen" | **nur Nutzer** | Claude nach der Analyse |
-| `WontDone` | wird nicht umgesetzt, braucht Begründung als Kommentar | **nur Nutzer** | Nutzer |
+| `Verworfen` | wird nicht umgesetzt, braucht Begründung als Kommentar | **nur Nutzer** | Nutzer |
 
 Weitere Label können hinzukommen. Ein unbekanntes Label ist kein Grund, ein Issue zu
 überspringen — aber ein Grund nachzufragen, wenn es die Behandlung ändern könnte.
@@ -62,13 +63,13 @@ wechseln. Der Workflow tut das (im Stoffverteilungsplan `.github/modellwahl.py`)
 Tabelle steht hier, damit du weißt, was der Nutzer damit steuert und was du ihm sagen
 kannst, wenn er fragt — nicht als Handlungsanweisung.
 
-### Duplicate richtig gesetzt
+### Duplikat richtig gesetzt
 
-Ist `Duplicate` gesetzt, **muss** das abdeckende Issue in den Relationships stehen — dort
+Ist `Duplikat` gesetzt, **muss** das abdeckende Issue in den Relationships stehen — dort
 nur die Nummer. Ein Kommentar kommt dazu, wenn eine Erklärung nötig ist, warum es ein
 Duplikat ist.
 
-Fällt dir ein `Duplicate`-Issue ohne diesen Verweis auf: **warnen**. Ohne den Verweis ist
+Fällt dir ein `Duplikat`-Issue ohne diesen Verweis auf: **warnen**. Ohne den Verweis ist
 das Label wertlos, weil niemand findet, wohin die Sache verschoben wurde.
 
 ## Priorität

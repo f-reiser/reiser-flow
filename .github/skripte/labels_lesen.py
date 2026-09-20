@@ -39,7 +39,8 @@ def aus_scopes(katalog):
     for scope, angaben in katalog.get("scopes", {}).items():
         farbe = angaben["farbe"]
         geschuetzt = bool(angaben.get("geschuetzt"))
-        for wert in angaben.get("werte", []):
+        for eintrag in angaben.get("werte", []):
+            wert, _ = _wert_und_vorher(eintrag)
             ergebnis.append(("%s::%s" % (scope, wert), farbe, "", geschuetzt))
     return ergebnis
 
@@ -57,17 +58,68 @@ def geschuetzte_scopes(pfad=KATALOG):
     return {s for s, a in lade(pfad).get("scopes", {}).items() if a.get("geschuetzt")}
 
 
+def _wert_und_vorher(eintrag):
+    """Ein Scope-Wert ist entweder ein blosser Name oder {"name", "vorher"} -
+    fuer Werte, die im Katalog schon einmal umbenannt wurden (f-reiser/reiser-flow#54)."""
+    if isinstance(eintrag, dict):
+        return eintrag["name"], list(eintrag.get("vorher", []))
+    return eintrag, []
+
+
+def katalog_eintraege(pfad=KATALOG):
+    """Der vollstaendige Katalog als Liste von Dicts - eine Zeile je Label,
+    auch die aus den Scopes aufgeklappten. Anders als alle()/einzelne() traegt
+    jeder Eintrag zusaetzlich "vorher" (frueherer Name/Namen desselben Labels),
+    damit label_abgleich.py umbenennen statt doppelt anlegen kann.
+    """
+    katalog = lade(pfad)
+    ergebnis = []
+    for l in katalog.get("label", []):
+        ergebnis.append({
+            "name": l["name"],
+            "farbe": l["farbe"],
+            "beschreibung": l.get("beschreibung", ""),
+            "geschuetzt": bool(l.get("geschuetzt")),
+            "vorher": list(l.get("vorher", [])),
+        })
+    for scope, angaben in katalog.get("scopes", {}).items():
+        farbe = angaben["farbe"]
+        geschuetzt = bool(angaben.get("geschuetzt"))
+        vorlage = angaben.get("beschreibung_vorlage", "")
+        for eintrag in angaben.get("werte", []):
+            wert, vorher = _wert_und_vorher(eintrag)
+            name = "%s::%s" % (scope, wert)
+            ergebnis.append({
+                "name": name,
+                "farbe": farbe,
+                "beschreibung": vorlage.format(wert=wert) if vorlage else "",
+                "geschuetzt": geschuetzt,
+                "vorher": ["%s::%s" % (scope, v) for v in vorher],
+            })
+    return ergebnis
+
+
+def entfernte(pfad=KATALOG):
+    """Label, die es im Katalog nicht mehr gibt - fuer die Loeschung im
+    Zielprojekt, sofern dort gerade nicht in Verwendung (f-reiser/reiser-flow#54).
+    Jeder Eintrag mindestens {"name": ...}."""
+    return list(lade(pfad).get("entfernt", []))
+
+
 #  ------------------------------------------------------------------ Selbsttest
 
 MUSTER = {
     "label": [
         {"name": "Einarbeiten", "farbe": "0e8a16", "beschreibung": "x", "geschuetzt": True},
         {"name": "Dokumentation", "farbe": "0075ca", "beschreibung": "y"},
+        {"name": "Duplikat", "farbe": "cfd3d7", "beschreibung": "z", "vorher": ["Duplicate", "duplicate"]},
     ],
     "scopes": {
-        "Modell": {"farbe": "bfdadc", "geschuetzt": True, "werte": ["Opus", "Sonnet"]},
-        "Prioritaet": {"farbe": "ffffff", "werte": ["hoch", "niedrig"]},
+        "Modell": {"farbe": "bfdadc", "geschuetzt": True, "werte": ["Opus", "Sonnet"],
+                   "beschreibung_vorlage": "nimm {wert}"},
+        "Prioritaet": {"farbe": "ffffff", "werte": ["hoch", {"name": "niedrig", "vorher": ["tief"]}]},
     },
+    "entfernt": [{"name": "Altlast"}],
 }
 
 
@@ -90,14 +142,17 @@ def selbsttest():
             if ist != erwartet:
                 fehler.append("%s: %r statt %r" % (was, ist, erwartet))
 
-        #  Einzelne Label unveraendert uebernommen.
+        #  Einzelne Label unveraendert uebernommen ("vorher" gehoert nicht zu
+        #  diesem alten, vierstelligen Tupelformat).
         e = einzelne(lade(pfad))
         pruefe("einzelne()", sorted(e),
                sorted([("Einarbeiten", "0e8a16", "x", True),
-                       ("Dokumentation", "0075ca", "y", False)]))
+                       ("Dokumentation", "0075ca", "y", False),
+                       ("Duplikat", "cfd3d7", "z", False)]))
 
         #  Scopes klappen zu "Scope::Wert" auf, mit der Scope-Farbe und ohne
-        #  eigene Beschreibung.
+        #  eigene Beschreibung - auch wenn ein Wert als {"name", "vorher"}
+        #  geschrieben ist statt als blosser String.
         s = aus_scopes(lade(pfad))
         pruefe("aus_scopes()", sorted(s),
                sorted([("Modell::Opus", "bfdadc", "", True),
@@ -117,6 +172,21 @@ def selbsttest():
         #  geschuetzt, weil der SCOPE es ist.
         pruefe("geschuetzte_scopes()", geschuetzte_scopes(pfad), {"Modell"})
 
+        #  katalog_eintraege(): die reichhaltige Form fuer label_abgleich.py -
+        #  mit "vorher", auch aus einem umbenannten Scope-Wert aufgeklappt.
+        k = {e["name"]: e for e in katalog_eintraege(pfad)}
+        pruefe("katalog_eintraege() Duplikat.vorher", k["Duplikat"]["vorher"],
+               ["Duplicate", "duplicate"])
+        pruefe("katalog_eintraege() Einarbeiten.vorher", k["Einarbeiten"]["vorher"], [])
+        pruefe("katalog_eintraege() Modell::Opus.beschreibung",
+               k["Modell::Opus"]["beschreibung"], "nimm Opus")
+        pruefe("katalog_eintraege() Prioritaet::niedrig.vorher",
+               k["Prioritaet::niedrig"]["vorher"], ["Prioritaet::tief"])
+        pruefe("katalog_eintraege() Anzahl", len(k), 3 + 2 + 2)
+
+        #  entfernte(): reine Weitergabe der "entfernt"-Liste des Katalogs.
+        pruefe("entfernte()", entfernte(pfad), [{"name": "Altlast"}])
+
     #  Der echte Katalog dieses Repositories: muss laden und die Label
     #  nennen, auf die geschuetzt.py sich verlaesst (Regression gegen
     #  konventionen.md).
@@ -129,7 +199,19 @@ def selbsttest():
         if scope not in echte_scopes:
             fehler.append("echter Katalog: Scope %r nicht geschuetzt" % scope)
 
-    gesamt = 5 + 3 + 3
+    #  "Lokale Arbeit" vermerkt, dass ein Vorgang ohne den Menschen nicht fertig
+    #  wird (f-reiser/reiser-flow#47). Es MUSS im Katalog stehen, damit
+    #  label-abgleich.yml es in jedem einbindenden Projekt anlegt - und es darf
+    #  NICHT geschuetzt sein: Gesetzt wird es vom unbeaufsichtigten Lauf, und der
+    #  hat kein Maintainer-Recht. Der Waechter naehme es ihm sofort wieder ab.
+    namen = {n for n, _, _, _ in alle(KATALOG)}
+    if "Lokale Arbeit" not in namen:
+        fehler.append("echter Katalog: 'Lokale Arbeit' fehlt")
+    if "Lokale Arbeit" in echte_geschuetzte:
+        fehler.append("'Lokale Arbeit' ist geschuetzt - der Lauf koennte es dann "
+                      "nicht selbst setzen")
+
+    gesamt = 11 + 3 + 3 + 2
     for f in fehler:
         print("FEHLER: " + f)
     print("%d von %d Pruefungen bestanden." % (gesamt - len(fehler), gesamt))

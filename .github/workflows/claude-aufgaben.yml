@@ -5,7 +5,7 @@ name: Claude-Aufgaben
 # Zeitplan ein:
 #
 #   on:
-#     schedule: [{ cron: "0 */4 * * *" }]
+#     schedule: [{ cron: "7 */4 * * *" }]   # nicht zur vollen Stunde, siehe #37
 #     workflow_dispatch:
 #   jobs:
 #     claude-aufgaben:
@@ -41,7 +41,9 @@ name: Claude-Aufgaben
 # gar keines - ein Schluessel, den es nicht gibt, macht die ganze Datei ungueltig
 # und legte die Automatik still (f-reiser/reiser-flow#43, Regel 8 in
 # .github/pruefe_workflows.py). Aenderungen an Workflow-Dateien bleiben deshalb
-# Handarbeit; der Lauf meldet sie als Rueckfrage.
+# Handarbeit. Der Lauf bricht darueber nicht ab: Er macht fertig, was ohne sie
+# geht, haengt den fehlenden Diff an den Vorgang und uebergibt ihn mit dem Label
+# "Lokale Arbeit" an den Nutzer (Verfahren im Skill github-issue-workflow).
 #
 # Der Name nennt bewusst nicht ein einzelnes Label: "Einarbeiten" war einmal das
 # einzige, inzwischen sind es mehrere. Laeuft auf GitHub-Runnern und damit
@@ -109,7 +111,7 @@ jobs:
       #  actions/checkout, denn github.repository ist das Repository des
       #  Aufrufers. fetch-depth: 0, weil die Branch-Strategie ein Rebase auf main
       #  verlangt; mit einem flachen Klon fehlt dafuer die Historie.
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           fetch-depth: 0
 
@@ -162,12 +164,29 @@ jobs:
             gh "$1" list -R "$GITHUB_REPOSITORY" --label "$2" --state open \
               --json number --jq '.[].number' 2>/dev/null || true
           }
-          #  Beide Auftragslabel: "Untersuche" ist genauso ein Auftrag an
-          #  den Lauf wie "Einarbeiten", nur ein anderer.
+          #  "Untersuche" ist genauso ein Auftrag an den Lauf wie
+          #  "Einarbeiten", nur ein anderer.
           for label in Einarbeiten Untersuche; do
             nummern issue "$label"
             nummern pr    "$label"
-          done | sort -un > nummern.txt
+          done > direkt.txt
+
+          #  "Rueckfrage" ist bidirektional (f-reiser/reiser-flow#53): Claude
+          #  setzt es fuer eine eigene Frage an den Nutzer, der Nutzer setzt
+          #  es fuer eine eigene Frage an Claude. Nur die zweite Richtung
+          #  soll diesen Lauf anstossen - sonst griffe er Claudes eigene,
+          #  noch unbeantwortete Frage wieder auf. rueckfrage_filtern.py
+          #  entscheidet das ueber die Timeline (wer hat zuletzt gesetzt).
+          { nummern issue Rückfrage; nummern pr Rückfrage; } \
+            | REPO="$GITHUB_REPOSITORY" \
+              python3 "$RUNNER_TEMP/reiser-flow/.github/skripte/rueckfrage_filtern.py" \
+              > vom_nutzer.txt
+
+          #  Teilt sich Auswahl, Branch-Zuordnung und den Drei-Vorgaenge-Deckel
+          #  mit den beiden Auftragslabeln. modellwahl.py erkennt einen reinen
+          #  Rueckfrage-Lauf an den Labels und waehlt dafuer einen billigeren
+          #  Standard.
+          cat direkt.txt vom_nutzer.txt | sort -un > nummern.txt
 
           #  Alle Branches, damit der naechste Schritt einem angefangenen
           #  Vorgang seinen Branch zuordnen kann.
@@ -264,7 +283,7 @@ jobs:
       #  id wieder da: Der letzte Schritt liest die strukturierte Ausgabe.
       - id: claude
         if: steps.vorpruefung.outputs.offen != '0'
-        uses: anthropics/claude-code-action@v1
+        uses: anthropics/claude-code-action@cfc3eb22bfed5c26ef66e3223c982af27e4524de  # v1.0.231
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           #  Modell und Aufwand kommen aus modellwahl.py, gespeist aus den
@@ -311,15 +330,19 @@ jobs:
             --permission-mode acceptEdits
             --allowedTools "Bash(gh *),Bash(git *),Bash(python3 *),Bash(python *),Bash(cd *),Task,Agent"
             --disallowedTools "Bash(gh pr merge *),Bash(gh release *),Bash(gh workflow disable *),Bash(gh workflow enable *),Bash(gh secret *),Bash(gh variable *),Bash(gh label *),Bash(gh repo delete *)"
-            --json-schema '{"type":"object","additionalProperties":false,"required":["skills","ergebnis"],"properties":{"skills":{"type":"array","items":{"type":"string"},"description":"Namen der Skills, die in diesem Lauf geladen waren und angewandt wurden"},"ergebnis":{"type":"string","enum":["abgearbeitet","nichts_gefunden","zurueckgestellt","rueckfrage","abgebrochen"]},"vorgang":{"type":"string","description":"Nummer des bearbeiteten Issues oder Pull Requests, sonst leer"},"bemerkung":{"type":"string"}}}'
+            --json-schema '{"type":"object","additionalProperties":false,"required":["skills","ergebnis"],"properties":{"skills":{"type":"array","items":{"type":"string"},"description":"Namen der Skills, die in diesem Lauf geladen waren und angewandt wurden"},"ergebnis":{"type":"string","enum":["abgearbeitet","nichts_gefunden","zurueckgestellt","rueckfrage","rueckfrage_beantwortet","abgebrochen"]},"vorgang":{"type":"string","description":"Nummer des bearbeiteten Issues oder Pull Requests, sonst leer"},"bemerkung":{"type":"string"}}}'
           prompt: |
             Automatischer Durchgang: Vorgaenge mit einem Auftragslabel
             abarbeiten - Issues wie Pull Requests - in diesem Repository.
 
-            Zwei Label sind Auftraege, und sie bedeuten Verschiedenes:
+            Drei Label loesen diesen Lauf aus, und sie bedeuten Verschiedenes:
             "Einarbeiten" heisst umsetzen, "Untersuche" heisst Fehlverhalten
-            nachstellen und analysieren. Was jeweils zu tun ist, steht im
-            Skill - fuer "Untersuche" im Abschnitt "Bugs untersuchen".
+            nachstellen und analysieren - beides mit Branch, Commit und Pull
+            Request. "Rueckfrage" ist anders: der NUTZER will von dir eine
+            Klaerung zu einem bestehenden Issue oder Pull Request, keine
+            Codeaenderung. Was jeweils zu tun ist, steht im Skill - fuer
+            "Untersuche" im Abschnitt "Bugs untersuchen", fuer "Rueckfrage"
+            im Abschnitt "Eine Rueckfrage beantworten".
 
             Ein Schritt davor hat bereits geprueft, dass mindestens einer
             offen ist; du wirst gar nicht erst gestartet, wenn nichts anliegt.
@@ -330,6 +353,8 @@ jobs:
                 gh pr    list --label Einarbeiten --state open --json number,title,updatedAt
                 gh issue list --label Untersuche  --state open --json number,title,updatedAt
                 gh pr    list --label Untersuche  --state open --json number,title,updatedAt
+                gh issue list --label Rückfrage   --state open --json number,title,updatedAt
+                gh pr    list --label Rückfrage   --state open --json number,title,updatedAt
 
             Findest du wider Erwarten nichts - jemand hat das Label in den
             letzten Sekunden entfernt -, beenden und das melden.
@@ -340,6 +365,11 @@ jobs:
             Branch:  ${{ steps.vorpruefung.outputs.branch }} - angelegt, gepusht
                      und ausgecheckt. Du stehst schon darauf.
             Fortschrittskommentar: ${{ steps.vorbereiten.outputs.kommentar }}
+
+            Traegt dieser Vorgang NUR "Rueckfrage" (weder "Einarbeiten" noch
+            "Untersuche"), bleibt der Branch oben ungenutzt - beantworte die
+            Frage als Kommentar am Vorgang selbst, ohne dort zu committen
+            oder zu pushen.
 
             Angefangene Vorgaenge: ${{ steps.vorpruefung.outputs.fortsetzen }}
 
@@ -361,6 +391,15 @@ jobs:
             Vorgaenge ein Durchgang ueberhaupt annehmen darf. Liegt weniger
             an, ist der Durchgang eben kuerzer. Fuer die legst du den Branch
             selbst an, nach demselben Schema.
+
+            Waehlst du dabei selbst einen weiteren "Rueckfrage"-Vorgang aus
+            der Liste oben: nur einen, dessen Label erkennbar VOM NUTZER
+            gesetzt wurde (`gh api repos/$GITHUB_REPOSITORY/issues/<nr>/timeline`,
+            juengstes "labeled"-Ereignis fuer "Rückfrage", Akteur kein Bot).
+            Ein Vorgang, dessen "Rueckfrage" von dir selbst oder einem
+            frueheren Lauf gesetzt wurde, ist DEINE eigene offene Frage an
+            den Nutzer - die uebergehst du, du beantwortest sie nicht dir
+            selbst.
 
             ## 2b. Sichern, waehrend du arbeitest - nicht am Schluss
 
@@ -435,6 +474,11 @@ jobs:
             - Kein Force-Push auf main, kein Direktcommit auf main, keine
               uebersprungenen Tests, kein --no-verify. (--force-with-lease auf dem
               eigenen Feature-Branch nach einem Rebase ist erlaubt und noetig.)
+            - Keine Aenderung an ".github/workflows/*" - das kann dieser Lauf
+              nicht, und er soll es nicht koennen. Braucht ein Vorgang eine,
+              uebergib ihn nach /github-issue-workflow, Abschnitt
+              "Workflow-Dateien kann nur der Nutzer aendern". Nicht erst am
+              abgelehnten Push merken.
             - Kein Release, kein Tag.
             - Keine Admin-Arbeiten: keine Repositories, Schutzregeln,
               Collaborators, Label oder Issue-Typen anlegen oder aendern.
@@ -460,7 +504,8 @@ jobs:
             Kurz. Immer: unter welcher Identitaet gearbeitet wurde und ob die
             Skills geladen waren. Dann je nach Ausgang: nichts gefunden /
             abgearbeitet (Nummer, Titel, Pull Request, Testergebnis) / Rueckfrage
-            oder Entscheidung gesetzt (Nummer und woran es haengt) / Issue ohne
+            beantwortet (Nummer, woran die Frage haengt) / Rueckfrage oder
+            Entscheidung gesetzt (Nummer und woran es haengt) / Issue ohne
             eindeutigen Typ gesehen (Nummern) / etwas gefunden, aber liegen
             gelassen (welcher Vorgang und warum). Das Letzte ist NICHT
             "nichts gefunden".

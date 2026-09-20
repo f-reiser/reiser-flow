@@ -123,7 +123,7 @@ das Plugin nicht mehr.
 `job.workflow_sha` und **nicht** `github.workflow_ref`: In einem per `workflow_call`
 aufgerufenen Workflow zeigt der `github`-Kontext auf den **Aufrufer**. Wer sich damit
 selbst nachlädt, holt den Stand, den der Aufrufer zufällig hat — die Anpinnung läuft ins
-Leere. `.github/pruefe_workflows.py` verhindert genau das, zusammen mit vier weiteren
+Leere. `.github/pruefe_workflows.py` verhindert genau das, zusammen mit fünf weiteren
 Zusagen, die sonst erst in einem fremden Projekt auffielen.
 
 ### Nie über `@main`
@@ -133,6 +133,33 @@ und ohne dass es auffällt. Ein fremder Workflow holt sich ausführbaren Code ü
 **Wer einen Tag verschieben kann, führt Code in fremden Projekten aus.** Das Verschieben
 eines veröffentlichten Tags ist ab hier keine Ordnungsfrage mehr, sondern
 sicherheitsrelevant (`semver-und-releases`).
+
+### Fremde Actions am Commit-SHA
+
+Derselbe Satz gilt in die andere Richtung: Auch `actions/checkout` und
+`anthropics/claude-code-action` laufen hier auf einem Runner mit Schreibtoken, die zweite
+bekommt zusätzlich das `CLAUDE_CODE_OAUTH_TOKEN`. Ein `@v7` oder `@v1` ist ein
+verschiebbarer Tag — wer ihn verschiebt, führt Code in allen einbindenden Projekten aus.
+
+Deshalb steht in jedem `uses:` der volle Commit-SHA und dahinter die Version als
+Kommentar:
+
+```yaml
+- uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+```
+
+Die Versionsangabe ist nicht Schmuck: Ein nackter SHA sagt nicht, wie alt er ist, und
+Anpinnen ohne Nachziehen tauscht ein Risiko nur gegen ein anderes. Regel 6 in
+`pruefe_workflows.py` setzt beides durch.
+
+**Nachziehen** — den neuen SHA holen und beide Stellen der Zeile ändern:
+
+```bash
+gh api repos/actions/checkout/git/ref/tags/v7.0.2 --jq .object.sha
+```
+
+Antwortet die Abfrage mit `"type": "tag"` statt `"commit"`, ist es ein annotierter Tag;
+dann zeigt `gh api repos/<owner>/<repo>/git/tags/<sha> --jq .object.sha` auf den Commit.
 
 ## Versionierung
 
