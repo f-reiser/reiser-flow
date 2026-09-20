@@ -1,23 +1,22 @@
 ---
 name: f-reiser-strukturarbeit
 description: >
-  NUR relevant für Softwareprojekte der eigenen GitHub-Organisation — der, die auch
-  reiser-flow selbst betreibt — und NUR in einer Sitzung am eigenen Rechner; bei jedem
-  Projekt ohne Bezug zu dieser Organisation ignorieren. Welche Organisation das konkret
-  ist, steht nicht hier (öffentliches Repository), sondern ergibt sich aus dem
-  Repository, in dem gerade gearbeitet wird. Für Projekte dieser Organisation: Kontext
-  für Strukturaufgaben, die direkt im Chat statt über den Issue-Workflow erledigt
-  werden — Skillset erweitern oder korrigieren, projektübergreifende Workflows anpassen,
-  Projektstruktur ändern. Ergänzt die Skills aus reiser-flow um das, was dort nicht
-  hingehört, weil es nur lokal gilt: wie sich eine Chat-Sitzung von einer Sitzung in
-  GitHub Actions unterscheidet, welches der angemeldeten GitHub-Konten wofür zuständig
-  ist, und welche Befehle ein Release auslösen. Nutze diesen Skill, sobald in einem
-  Projekt dieser Organisation eine Strukturaufgabe ansteht statt einer Fachaufgabe an
-  einem einzelnen Repository, wenn zu klären ist, welches Konto oder Repository gemeint
-  ist, und bei jedem Release-Befehl des Nutzers.
+  NUR relevant für Softwareprojekte, die reiser-flow tatsächlich einbinden (jeder kann
+  das in seiner eigenen GitHub-Organisation, mit eigenen Konten und eigenem
+  Claude-Zugang — nicht auf eine bestimmte Organisation beschränkt), und NUR in einer
+  Sitzung am eigenen Rechner; bei jedem Projekt ohne erkennbaren Bezug zu reiser-flow
+  ignorieren. Für solche Projekte: Kontext für Strukturaufgaben, die direkt im Chat
+  statt über den Issue-Workflow erledigt werden — Skillset erweitern oder korrigieren,
+  projektübergreifende Workflows anpassen, Projektstruktur ändern. Ergänzt die Skills
+  aus reiser-flow um das, was dort nicht hingehört, weil es nur lokal gilt: wie sich
+  eine Chat-Sitzung von einer Sitzung in GitHub Actions unterscheidet, welches der
+  angemeldeten GitHub-Konten wofür zuständig ist, und welche Befehle ein Release
+  auslösen. Nutze diesen Skill, sobald in einem solchen Projekt eine Strukturaufgabe
+  ansteht statt einer Fachaufgabe an einem einzelnen Repository, wenn zu klären ist,
+  welches Konto oder Repository gemeint ist, und bei jedem Release-Befehl des Nutzers.
 ---
 
-# Strukturarbeit — nur die eigene Organisation, nur lokal
+# Strukturarbeit — nur für Projekte mit reiser-flow, nur lokal
 
 ## Zwei Schranken, bevor irgendetwas hier gilt
 
@@ -29,13 +28,23 @@ Workflow-Datei: melden, und nichts aus diesem Skill anwenden.
 
 Warum das zwei Plugins sind und keine zwei Repositories: `README.md` im Wurzelverzeichnis.
 
-**2. Nur die eigene Organisation.** Bei jedem anderen Projekt — auch bei anderen eigenen
-Repositories außerhalb dieser Organisation — sagt dieser Skill nichts Sinnvolles. Welche
-das ist, steht absichtlich nirgends in diesem öffentlichen Repository (siehe „Welches
-Konto wofür" unten für dieselbe Regel bei Kontennamen) — vor der Anwendung kurz per
-`gh repo view --json owner --jq .owner.login` im aktuellen Projekt prüfen, ob es zu
-derselben Organisation gehört wie `reiser-flow` selbst, oder ob erkennbar etwas dafür
-entstehen soll.
+**2. Nur Projekte, die reiser-flow tatsächlich einbinden.** Bei jedem anderen Projekt
+sagt dieser Skill nichts Sinnvolles — auch nicht bei einem anderen eigenen Repository,
+das zufällig derselben Organisation gehört, reiser-flow selbst aber nicht nutzt.
+**reiser-flow ist nicht auf eine Organisation beschränkt:** Jeder kann es einbinden, in
+seiner eigenen Organisation, mit eigenen Konten und eigenem Claude-Zugang — dieser
+Skill gilt dann dort genauso, nur eben für diese andere Organisation.
+
+Erkennbar ist die Zugehörigkeit an den eigenen Workflow-Dateien: Sie binden
+`<eigene-organisation>/reiser-flow` ein, etwa `uses: <organisation>/reiser-flow/
+.github/workflows/claude-aufgaben.yml@<tag>`. Vor der Anwendung kurz nachsehen
+(`grep -r reiser-flow .github/workflows/`), ob das aktuelle Projekt so einen Verweis
+trägt — oder ob erkennbar ist, dass er entstehen soll. Arbeitest du direkt im
+Repository `reiser-flow` selbst, gilt das immer, unabhängig von seiner Organisation.
+
+Die konkrete Organisation selbst steht deshalb nirgends fest — sie ergibt sich aus
+genau diesem Verweis oder aus `gh repo view --json owner --jq .owner.login` am
+aktuellen Projekt, sobald die Zugehörigkeit so geklärt ist.
 
 ## Wofür dieser Skill sonst da ist
 
