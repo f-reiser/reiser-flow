@@ -103,6 +103,7 @@ eine Quelle, sonst altert dieselbe Regel getrennt.
 | `label-abgleich.yml` | legt den Label-Katalog aus `.github/labels.json` in einem Projekt an und aktualisiert ihn — nur anlegen und ändern, nie löschen |
 | `pruefung-vermerken.yml` | hängt das Ergebnis der Projektprüfung an den Fortschrittskommentar des Vorgangs |
 | `issue-autoclose.yml` | schließt ein offenes Issue, sobald ein Pull Request auf dessen `issue-<nr>-*`-Branch vom Maintainer-Konto gemergt wurde |
+| `veraltete-auftraege.yml` | nimmt ein geschütztes Label zurück, das länger als fünf Tage ununterbrochen an einem Vorgang hängt, ohne dass sich etwas getan hat |
 
 Wie ein Projekt sie einbindet, steht als Beispiel im Kopf der jeweiligen Datei. Ein
 vollständig umgestelltes Projekt ist `f-reiser/Stoffverteilungsplan`.

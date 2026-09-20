@@ -153,6 +153,25 @@ def waehle_vorgang(paare, kandidaten, pr_branches=None):
     return nr, "issue-%d-%s" % (nr, slug(titel))
 
 
+def kandidatenliste(paare, kandidaten, hoechstens=HOECHSTENS):
+    """Bis zu hoechstens Vorgangsnummern, in der Reihenfolge, in der ein Lauf sie
+    annehmen wuerde: angefangene zuerst (wie sie zuordnen() liefert), danach die
+    uebrigen Kandidaten nach demselben Kriterium wie waehle_vorgang() - laengste
+    Untaetigkeit zuerst (f-reiser/reiser-flow#23: dieselbe Liste, ueber die der
+    Runner vorab die Pruefsummen-Caches der Kandidaten restauriert, bevor das
+    Modell startet - mehr als hoechstens Vorgaenge kann ein Durchgang ohnehin
+    nicht annehmen)."""
+    ergebnis = [nr for nr, _ in paare][:hoechstens]
+    schon = set(ergebnis)
+    uebrige = sorted((k for k in kandidaten if k[0] not in schon),
+                     key=lambda k: (k[1], k[0]))
+    for nr, _, _ in uebrige:
+        if len(ergebnis) >= hoechstens:
+            break
+        ergebnis.append(nr)
+    return ergebnis
+
+
 def lies_kandidaten(pfad):
     """[(nr, updatedAt, titel), ...] - Zeilen ohne Nummer werden uebergangen."""
     kandidaten = []
@@ -183,13 +202,16 @@ def main():
     offen = len({n for n in nummern if n.isdigit()})
     fortsetzen = "; ".join("%d auf %s" % p for p in paare)
 
-    nr, branch = waehle_vorgang(paare, lies_kandidaten("kandidaten.txt"),
-                                 lies_pr_branches("pr_branches.txt"))
+    kandidaten = lies_kandidaten("kandidaten.txt")
+    nr, branch = waehle_vorgang(paare, kandidaten, lies_pr_branches("pr_branches.txt"))
+    kliste = kandidatenliste(paare, kandidaten)
 
     zeilen = ["Vorgaenge mit Auftragslabel: %d" % offen]
     zeilen.append("Dieser Lauf faengt an mit: "
                   + ("%s auf %s" % (nr, branch) if nr else "nichts"))
     zeilen.append("Fortsetzen: " + (fortsetzen or "nichts angefangen"))
+    zeilen.append("Kandidaten fuer die Pruefsumme: "
+                  + (", ".join(str(n) for n in kliste) or "keine"))
     zeilen += meldungen
 
     text = chr(10).join(zeilen)
@@ -199,10 +221,16 @@ def main():
         io.open(z, "a", encoding="utf-8").write(text + chr(10))
     a = os.environ.get("GITHUB_OUTPUT")
     if a:
+        #  kandidat_1..kandidat_HOECHSTENS: feste, statisch referenzierbare
+        #  Ausgaben, weil eine Workflow-Datei keine dynamische Anzahl Schritte
+        #  kennt - HOECHSTENS ist damit auch hier die Obergrenze, nicht nur
+        #  beim Batching selbst.
+        kfelder = "".join("kandidat_%d=%s%s" % (i + 1, (kliste[i] if i < len(kliste) else ""), chr(10))
+                          for i in range(HOECHSTENS))
         io.open(a, "a", encoding="utf-8").write(
-            "offen=%d%sfortsetzen=%s%svorgang=%s%sbranch=%s%s"
+            "offen=%d%sfortsetzen=%s%svorgang=%s%sbranch=%s%s%s"
             % (offen, chr(10), fortsetzen, chr(10),
-               nr or "", chr(10), branch or "", chr(10)))
+               nr or "", chr(10), branch or "", chr(10), kfelder))
     return 0
 
 
@@ -292,6 +320,17 @@ def selbsttest():
            lambda: waehle_vorgang([], K, pr_branches={9999: "irrelevant"}),
            (31, "issue-31-nutzer-auf-fehlerhafte-bezuege-hinweisen"))
 
+    #  --- kandidatenliste(): bis zu HOECHSTENS, fuer die Pruefsummen-Caches ---
+    pruefe("angefangene zuerst, dann die uebrigen nach Alter",
+           lambda: kandidatenliste([(7, "issue-7-x")], K), [7, 31, 30])
+    pruefe("ohne Angefangenes: reine Altersreihenfolge",
+           lambda: kandidatenliste([], K), [31, 30])
+    pruefe("auf hoechstens gekappt",
+           lambda: kandidatenliste([], K, hoechstens=1), [31])
+    pruefe("ein Kandidat, der schon angefangen ist, zaehlt nicht doppelt",
+           lambda: kandidatenliste([(31, "issue-31-x")], K), [31, 30])
+    pruefe("leer bleibt leer", lambda: kandidatenliste([], []), [])
+
     #  Bei gleichem Zeitstempel muessen zwei Laeufe dasselbe waehlen.
     pruefe("Gleichstand nach Nummer",
            lambda: waehle_vorgang([], [(9, "T", "b"), (4, "T", "a")])[0], 4)
@@ -337,7 +376,7 @@ def selbsttest():
 
     for f in fehler:
         print("FEHLER: " + f)
-    gesamt = 27
+    gesamt = 32
     print("%d von %d Pruefungen bestanden." % (gesamt - len(fehler), gesamt))
     return 1 if fehler else 0
 

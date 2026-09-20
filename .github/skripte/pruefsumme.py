@@ -30,12 +30,14 @@ WARUM BOT-KOMMENTARE NICHT ZAEHLEN
     meldete einen Angriff, wo nur sein Vorgaenger gearbeitet hat.
 
 WO DIE PRUEFSUMME LIEGT
-    In einem Kommentar am Vorgang selbst, erkennbar an einer Marke - dasselbe
-    Muster wie der Fortschrittskommentar (fortschritt.py). Er ueberlebt
-    beliebig lange, laesst sich ueberschreiben, braucht keine zusaetzliche
-    Berechtigung und ist nachlesbar. Gezaehlt wird nur ein Kommentar eines
-    Bots: Wer bloss Lesezugriff hat, kann zwar kommentieren, aber keinen
-    Bot-Kommentar erzeugen.
+    Im Actions-Cache des Repositories, nicht in einem Kommentar: Eine
+    Pruefsumme ist ein Sicherheitsmerkmal, ein Kommentar waere fuer jeden mit
+    Lesezugriff einsehbar (f-reiser/reiser-flow#23, Ruecksprache vom
+    20.09.2026). label-waechter.yml legt sie beim Setzen des Auftragslabels
+    unter einem Schluessel ab, der die Vorgangsnummer traegt; claude-aufgaben.yml
+    holt sie sich per "restore-keys:"-Praefix zurueck - das Ablegen und
+    Restaurieren selbst ist Sache der Workflow-Datei (actions/cache), dieses
+    Skript sieht nur die lokale Datei, die dabei entsteht bzw. gebraucht wird.
 """
 import hashlib
 import io
@@ -46,9 +48,8 @@ import subprocess
 import sys
 import tempfile
 
-MARKE = "<!-- auftrag-pruefsumme -->"
-SUMME = re.compile(r"sha256:([0-9a-f]{64})")
 TRENNER = chr(10) + "----8<----" + chr(10)
+SUMME_ZEILE = re.compile(r"^([0-9a-f]{64})\s*$")
 
 
 def ist_bot(autor):
@@ -76,34 +77,15 @@ def pruefsumme(text):
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
-def abgelegte_summe(kommentare):
-    """(id, summe) aus dem letzten Bot-Kommentar mit der Marke, sonst
-    (None, None).
-
-    Nur von einem Bot: Einen Kommentar mit derselben Marke darf jeder
-    schreiben, der lesen darf - einen Bot-Kommentar nicht.
-    """
-    treffer = (None, None)
-    for k in kommentare:
-        if not ist_bot(k.get("user")):
-            continue
-        text = k.get("body") or ""
-        if MARKE not in text:
-            continue
-        m = SUMME.search(text)
-        if m:
-            treffer = (k.get("id"), m.group(1))
-    return treffer
-
-
-def kommentartext(summe):
-    return (MARKE + chr(10)
-            + "`sha256:" + summe + "`" + chr(10) * 2
-            + "Stand von Titel, Beschreibung und Kommentaren, als das "
-              "Auftragslabel gesetzt wurde. Aendert sich daran etwas, nimmt "
-              "der Label-Waechter das Auftragslabel zurueck; der "
-              "unbeaufsichtigte Lauf arbeitet nur an einem Vorgang, dessen "
-              "Pruefsumme noch stimmt." + chr(10))
+def gelesene_summe(pfad):
+    """Die im Actions-Cache abgelegte Pruefsumme aus der restaurierten Datei,
+    sonst None - fehlt sie (kein Cache-Treffer) oder ist sie kein sha256-Hex,
+    ist das gleichbedeutend mit "keine Pruefsumme abgelegt"."""
+    if not pfad or not os.path.isfile(pfad):
+        return None
+    inhalt = io.open(pfad, encoding="utf-8").read()
+    m = SUMME_ZEILE.match(inhalt.strip())
+    return m.group(1) if m else None
 
 
 def uebergabetext(titel, body, kommentare):
@@ -176,28 +158,29 @@ WARNUNG = (
       + chr(10))
 
 
-def schreiben(repo, nr):
+def schreiben(repo, nr, ausgabe_pfad):
+    """Schreibt die aktuelle Pruefsumme in eine lokale Datei - der Workflow-
+    Schritt danach legt sie in den Actions-Cache (label-waechter.yml)."""
     titel, body, kommentare = hole(repo, nr)
     summe = pruefsumme(relevanter_text(titel, body, kommentare))
-    alt_id, alt_summe = abgelegte_summe(kommentare)
-    if alt_summe == summe:
-        print("Pruefsumme unveraendert (#%s)." % nr)
-        return 0
-    #  Ohne Nachfrage ueberschreiben: Ein Rest aus einem abgebrochenen Lauf
-    #  darf den neuen Auftrag nicht aufhalten.
-    kommentieren(repo, nr, kommentartext(summe), alt_id)
-    print("Pruefsumme %s fuer #%s abgelegt." % (summe[:12], nr))
+    with io.open(ausgabe_pfad, "w", encoding="utf-8", newline="") as f:
+        f.write(summe + chr(10))
+    print("Pruefsumme %s fuer #%s nach %s geschrieben." % (summe[:12], nr, ausgabe_pfad))
     return 0
 
 
-def pruefen(repo, nummern, ziel):
-    """Vergleicht je Vorgang und legt den geprueften Text ab. Gibt die Liste
-    der Beanstandungen zurueck - leer heisst: alles stimmt."""
+def pruefen(repo, kandidaten, ziel):
+    """kandidaten: [(nr, restore_pfad), ...] - restore_pfad ist die Datei, die
+    ein vorangehender "actions/cache/restore"-Schritt fuer diese Nummer
+    angelegt hat, oder ein nicht existierender Pfad ohne Cache-Treffer.
+
+    Vergleicht je Vorgang und legt den geprueften Text ab. Gibt die Liste der
+    Beanstandungen zurueck - leer heisst: alles stimmt."""
     befunde = []
-    for nr in nummern:
+    for nr, restore_pfad in kandidaten:
         titel, body, kommentare = hole(repo, nr)
         ist = pruefsumme(relevanter_text(titel, body, kommentare))
-        _, soll = abgelegte_summe(kommentare)
+        soll = gelesene_summe(restore_pfad)
         if soll is None:
             befunde.append((nr, "Es liegt keine Pruefsumme am Vorgang."))
             continue
@@ -212,14 +195,27 @@ def pruefen(repo, nummern, ziel):
     return befunde
 
 
+def lies_kandidaten_pruefsumme(pfad):
+    """[(nr, restore_pfad), ...] aus "<nr>\\t<restore_pfad>"-Zeilen."""
+    if not os.path.isfile(pfad):
+        return []
+    ergebnis = []
+    for zeile in io.open(pfad, encoding="utf-8"):
+        zeile = zeile.rstrip(chr(10)).rstrip(chr(13))
+        if not zeile.strip():
+            continue
+        nr, _, rest = zeile.partition(chr(9))
+        ergebnis.append((nr.strip(), rest.strip()))
+    return ergebnis
+
+
 def main():
     repo = os.environ["REPO"]
     if "--schreiben" in sys.argv:
-        return schreiben(repo, os.environ["NR"])
+        return schreiben(repo, os.environ["NR"], os.environ["AUSGABE"])
 
-    nummern = [z.strip() for z in io.open("nummern.txt", encoding="utf-8")
-               if z.strip()] if os.path.isfile("nummern.txt") else []
-    befunde = pruefen(repo, nummern, os.environ.get("RUNNER_TEMP", "."))
+    kandidaten = lies_kandidaten_pruefsumme("kandidaten-pruefsumme.txt")
+    befunde = pruefen(repo, kandidaten, os.environ.get("RUNNER_TEMP", "."))
     for nr, grund in befunde:
         print("::error::Pruefsumme von #%s stimmt nicht - %s" % (nr, grund))
         try:
@@ -290,25 +286,38 @@ def selbsttest():
            pruefsumme(relevanter_text("T", "ab", [_k("c")]))
            == pruefsumme(relevanter_text("T", "a", [_k("bc")])), False)
 
-    #  --- abgelegte Summe -------------------------------------------------
+    #  --- gelesene Summe (aus der restaurierten Cache-Datei) --------------
+    import tempfile as _tempfile
     sha = "a" * 64
-    echt = _k(MARKE + chr(10) + "`sha256:" + sha + "`", typ="Bot", id=7)
-    pruefe("Summe aus dem Bot-Kommentar", abgelegte_summe([echt]), (7, sha))
-    pruefe("keine Marke, keine Summe", abgelegte_summe([_k("egal")]),
-           (None, None))
-    #  Genau der Weg, auf dem sich sonst eine fremde Summe unterschieben
-    #  liesse: Kommentieren darf jeder mit Lesezugriff.
-    gefaelscht = _k(MARKE + chr(10) + "`sha256:" + "b" * 64 + "`", id=8)
-    pruefe("Mensch kann keine Summe ablegen", abgelegte_summe([gefaelscht]),
-           (None, None))
-    pruefe("bei mehreren gilt die letzte",
-           abgelegte_summe([echt, _k(MARKE + " `sha256:" + "c" * 64 + "`",
-                                     typ="Bot", id=9)]),
-           (9, "c" * 64))
-    #  Was das Skript selbst schreibt, muss es auch wieder lesen koennen.
-    pruefe("eigener Kommentar ist lesbar",
-           abgelegte_summe([_k(kommentartext(sha), typ="Bot", id=3)]),
-           (3, sha))
+    with _tempfile.TemporaryDirectory() as td:
+        vorhanden = os.path.join(td, "vorhanden.txt")
+        io.open(vorhanden, "w", encoding="utf-8", newline="").write(sha + chr(10))
+        pruefe("Summe aus der restaurierten Datei", gelesene_summe(vorhanden), sha)
+
+        leer = os.path.join(td, "leer.txt")
+        io.open(leer, "w", encoding="utf-8").write("")
+        pruefe("leere Datei -> keine Summe", gelesene_summe(leer), None)
+
+        muell = os.path.join(td, "muell.txt")
+        io.open(muell, "w", encoding="utf-8").write("kein-sha256")
+        pruefe("kein Hex-Digest -> keine Summe", gelesene_summe(muell), None)
+
+        pruefe("fehlende Datei -> keine Summe (kein Cache-Treffer)",
+               gelesene_summe(os.path.join(td, "gibtsnicht.txt")), None)
+        pruefe("leerer Pfad -> keine Summe", gelesene_summe(""), None)
+        pruefe("None -> keine Summe", gelesene_summe(None), None)
+
+    #  --- lies_kandidaten_pruefsumme() -------------------------------------
+    with _tempfile.TemporaryDirectory() as td:
+        pfad = os.path.join(td, "kandidaten-pruefsumme.txt")
+        io.open(pfad, "w", encoding="utf-8", newline="").write(
+            "31" + chr(9) + "/tmp/a.txt" + chr(10)
+            + chr(10)
+            + "7" + chr(9) + "/tmp/b.txt" + chr(10))
+        pruefe("Kandidaten eingelesen", lies_kandidaten_pruefsumme(pfad),
+               [("31", "/tmp/a.txt"), ("7", "/tmp/b.txt")])
+        pruefe("fehlende Datei -> leere Liste",
+               lies_kandidaten_pruefsumme(os.path.join(td, "nix.txt")), [])
 
     #  --- Uebergabetext ---------------------------------------------------
     ue = uebergabetext("Titel", "Body", [_k("Hallo", login="florian"),
@@ -333,7 +342,7 @@ def selbsttest():
     pruefe("Kommentarzeile zaehlt nicht als Aufruf",
            ruft_auf("#  pruefsumme.py --schreiben", "--schreiben"), False)
 
-    gesamt = 3 + 1 + 1 + 5 + 1 + 5 + 4 + 1 + 3
+    gesamt = 27
     for f in fehler:
         print("FEHLER: " + f)
     print("%d von %d Pruefungen bestanden." % (gesamt - len(fehler), gesamt))

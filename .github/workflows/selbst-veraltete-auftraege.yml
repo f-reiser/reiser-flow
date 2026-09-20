@@ -1,0 +1,15 @@
+name: Selbst-Veraltete-Auftraege
+
+# reiser-flow wendet veraltete-auftraege.yml auf sich selbst an - ueber den
+# lokalen Pfad, damit dieser Lauf den Stand des eigenen main ausfuehrt.
+
+on:
+  schedule:
+    - cron: "38 5 * * *"
+  workflow_dispatch:
+
+jobs:
+  veraltete-auftraege:
+    uses: ./.github/workflows/veraltete-auftraege.yml
+    permissions:
+      issues: write

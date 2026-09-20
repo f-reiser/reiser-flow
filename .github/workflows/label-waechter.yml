@@ -16,6 +16,7 @@ name: Label-Waechter
 #       permissions:            # MUSS der Aufrufer setzen
 #         issues: write
 #         pull-requests: write
+#         actions: read        # fuer den Pruefsummen-Cache (#23), siehe unten
 #
 # Ein aufgerufener Workflow kann Berechtigungen nur beibehalten oder senken, nie
 # erhoehen - was der Aufrufer nicht gibt, bekommt dieser Job auch dann nicht, wenn
@@ -75,6 +76,9 @@ on:
 permissions:
   issues: write
   pull-requests: write
+  #  Fuer actions/cache/save (Pruefsumme, #23): der Cache-Dienst braucht
+  #  mindestens Lesezugriff auf die Actions-API des Laufs.
+  actions: read
 
 jobs:
   zuruecknehmen:
@@ -184,13 +188,20 @@ jobs:
       #  Welche Label Auftraege sind, steht nur in labels.json; labels_lesen.py
       #  gibt sie aus. Ein drittes Auftragslabel wird dort eingetragen und
       #  wirkt ohne weiteres Zutun hier wie in claude-aufgaben.yml.
+      #
+      #  Schreibt nur noch eine lokale Datei - der folgende Schritt legt sie in
+      #  den Actions-Cache. Eine Pruefsumme in einem Kommentar waere fuer jeden
+      #  mit Lesezugriff einsehbar, und das ist bei einem Sicherheitsmerkmal
+      #  nicht gewollt (f-reiser/reiser-flow#23, Ruecksprache vom 20.09.2026).
       - name: Pruefsumme des freigegebenen Standes ablegen
+        id: pruefsumme
         if: github.event.action == 'labeled' && steps.berechtigung.outputs.geblieben == 'ja'
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           NR: ${{ github.event.issue.number || github.event.pull_request.number }}
           LABEL: ${{ github.event.label.name }}
+          AUSGABE: ${{ runner.temp }}/pruefsumme-schreiben.txt
         run: |
           S="$GITHUB_WORKSPACE/_reiser-flow/.github/skripte"
           if ! python3 "$S/labels_lesen.py" --auftrag | grep -qxF "$LABEL"; then
@@ -198,13 +209,26 @@ jobs:
             exit 0
           fi
           python3 "$S/pruefsumme.py" --schreiben
+          echo "abgelegt=ja" >> "$GITHUB_OUTPUT"
+
+      #  Eigener Schritt, weil das Ablegen im Actions-Cache keine "run:"-Zeile
+      #  ist, sondern eine eigene Action. Jeder Schreibvorgang bekommt einen
+      #  frischen Schluessel (Lauf-ID angehaengt) statt einen bestehenden zu
+      #  ueberschreiben - ein Cache-Eintrag ist unveraenderlich, sobald er
+      #  angelegt ist. claude-aufgaben.yml holt sich ueber "restore-keys:" (mit
+      #  demselben Praefix, ohne die Lauf-ID) immer den JUENGSTEN.
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        if: steps.pruefsumme.outputs.abgelegt == 'ja'
+        with:
+          path: ${{ runner.temp }}/pruefsumme-schreiben.txt
+          key: pruefsumme-${{ github.event.issue.number || github.event.pull_request.number }}-${{ github.run_id }}-${{ github.run_attempt }}
 
       #  Der Vorgang hat sich geaendert, nachdem ihn jemand freigegeben hat.
       #  Erlaubt und normal - aber die Freigabe galt der alten Fassung.
       #
-      #  Ohne die Bot-Ausnahme naehme dieser Schritt das Label ab, das der
-      #  Schritt darueber gerade bestaetigt hat: Dessen Pruefsummen-Kommentar
-      #  ist selbst ein "issue_comment created".
+      #  Ohne die Bot-Ausnahme naehme dieser Schritt das Label ab, sobald der
+      #  unbeaufsichtigte Lauf selbst an den Vorgang schreibt - Fortschritts-
+      #  oder Abschlusskommentar, beide loesen "issue_comment created" aus.
       - name: Auftragslabel abnehmen, wenn sich der Vorgang geaendert hat
         if: github.event.action != 'labeled' && github.event.sender.type != 'Bot'
         env:

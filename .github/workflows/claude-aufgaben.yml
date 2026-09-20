@@ -262,15 +262,69 @@ jobs:
               2>/dev/null || true
           done | sort -u | nur_offene > pr_branches.txt
 
-          #  Stimmt der Vorgang noch mit dem ueberein, was beim Labeln
-          #  freigegeben wurde? Bricht hier ab, wenn nicht - claude-code wird
-          #  dann gar nicht erst aufgerufen (#23). Legt den geprueften Text je
-          #  Vorgang als "vorgang-<nr>.md" in RUNNER_TEMP ab; der Prompt
-          #  verweist darauf, damit der Lauf den Vorgang nicht ein zweites Mal
-          #  liest und die Luecke zwischen Pruefung und Arbeit offen laesst.
-          python3 "$RUNNER_TEMP/reiser-flow/.github/skripte/pruefsumme.py"
 
           python3 "$RUNNER_TEMP/reiser-flow/.github/skripte/zuordnung.py"
+
+      #  Die abgelegte Pruefsumme (Schritt "Pruefsumme des freigegebenen
+      #  Standes ablegen" in label-waechter.yml) liegt im Actions-Cache, nicht
+      #  mehr in einem Kommentar - sichtbar nur fuer Schreibberechtigte waere
+      #  eine Zusage, die ein oeffentliches Repository nicht halten kann
+      #  (f-reiser/reiser-flow#23, Ruecksprache vom 20.09.2026). Ein
+      #  aufgerufener Workflow kennt keine dynamische Anzahl Schritte, deshalb
+      #  hier HOECHSTENS (siehe zuordnung.py) statische, aber fuer sich
+      #  wirkungslose Restores: Ohne Kandidat an dieser Stelle (kandidat_N
+      #  leer) greift die if:-Bedingung nicht, und die Datei bleibt schlicht
+      #  ungeschrieben - pruefsumme.py wertet das unten als "keine Pruefsumme
+      #  abgelegt".
+      #
+      #  "key:" trifft absichtlich nie genau - der Schreib-Schritt haengt
+      #  seine eigene Lauf-ID an, die hier nicht bekannt ist. Das erzwingt den
+      #  Sprung zu "restore-keys:", und der liefert dank Praefixsuche immer
+      #  den JUENGSTEN Eintrag zu diesem Vorgang.
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        if: steps.vorpruefung.outputs.kandidat_1 != ''
+        with:
+          path: ${{ runner.temp }}/pruefsumme-cache-1
+          key: pruefsumme-${{ steps.vorpruefung.outputs.kandidat_1 }}-restore-only
+          restore-keys: |
+            pruefsumme-${{ steps.vorpruefung.outputs.kandidat_1 }}-
+
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        if: steps.vorpruefung.outputs.kandidat_2 != ''
+        with:
+          path: ${{ runner.temp }}/pruefsumme-cache-2
+          key: pruefsumme-${{ steps.vorpruefung.outputs.kandidat_2 }}-restore-only
+          restore-keys: |
+            pruefsumme-${{ steps.vorpruefung.outputs.kandidat_2 }}-
+
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        if: steps.vorpruefung.outputs.kandidat_3 != ''
+        with:
+          path: ${{ runner.temp }}/pruefsumme-cache-3
+          key: pruefsumme-${{ steps.vorpruefung.outputs.kandidat_3 }}-restore-only
+          restore-keys: |
+            pruefsumme-${{ steps.vorpruefung.outputs.kandidat_3 }}-
+
+      #  Stimmt der Vorgang noch mit dem ueberein, was beim Labeln
+      #  freigegeben wurde? Bricht hier ab, wenn nicht - claude-code wird
+      #  dann gar nicht erst aufgerufen (#23). Legt den geprueften Text je
+      #  Vorgang als "vorgang-<nr>.md" in RUNNER_TEMP ab; der Prompt
+      #  verweist darauf, damit der Lauf den Vorgang nicht ein zweites Mal
+      #  liest und die Luecke zwischen Pruefung und Arbeit offen laesst.
+      - id: pruefsumme
+        if: steps.vorpruefung.outputs.offen != '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        working-directory: ${{ runner.temp }}
+        run: |
+          {
+            echo "${{ steps.vorpruefung.outputs.kandidat_1 }}	$RUNNER_TEMP/pruefsumme-cache-1"
+            echo "${{ steps.vorpruefung.outputs.kandidat_2 }}	$RUNNER_TEMP/pruefsumme-cache-2"
+            echo "${{ steps.vorpruefung.outputs.kandidat_3 }}	$RUNNER_TEMP/pruefsumme-cache-3"
+          } | awk -F'\t' '$1 != ""' > kandidaten-pruefsumme.txt
+
+          python3 "$RUNNER_TEMP/reiser-flow/.github/skripte/pruefsumme.py"
 
       #  Welches Modell und welcher Aufwand - aus den Labels, nach festen Regeln.
       #  Das MUSS hier stehen und nicht im Prompt: Ein Lauf kann sein eigenes
