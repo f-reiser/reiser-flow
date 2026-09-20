@@ -97,6 +97,20 @@ HOLT_DIESES_REPOSITORY = re.compile(
 PROJEKTWOERTER = ("Makros", ".bas", ".xlsm", "openpyxl", "cp1252",
                   "Stoffverteilungsplan", "pruefe_alles")
 
+
+def projektwort_trifft(wort, text):
+    """True, wenn 'wort' in 'text' vorkommt - fuer eine Dateiendung (fuehrender
+    Punkt) nur, wenn danach kein weiterer Wortbuchstabe folgt.
+
+    Ohne diese Grenze faengt ".bas" auch ".baseRefName" - denselben vier
+    Zeichen in einem jq-Feldzugriff, kein VBA-Modul (f-reiser/reiser-flow#7).
+    Woerter ohne fuehrenden Punkt sind Bezeichner, kein Suffix, und bleiben
+    eine einfache Teilstring-Suche.
+    """
+    if not wort.startswith("."):
+        return wort in text
+    return re.search(re.escape(wort) + r"(?![A-Za-z0-9_])", text) is not None
+
 #  Die Scopes, die GitHub in einem "permissions:"-Block kennt. Geschlossene Liste:
 #  Was hier fehlt, macht die ganze Datei ungueltig. Kommt ein neuer Scope dazu,
 #  gehoert er hierher - eine Zeile, gegen einen Ausfall des gesamten Repositories.
@@ -289,7 +303,7 @@ def befunde(name, roh):
                       % (DIESES_REPOSITORY, RICHTIGER_SELBSTBEZUG))
 
             for wort in PROJEKTWOERTER:
-                if wort in block:
+                if projektwort_trifft(wort, block):
                     melde(zeile, "projektspezifisch: %r gehoert nicht in einen "
                                  "aufrufbaren Workflow" % wort)
 
@@ -411,6 +425,14 @@ def selbsttest():
     for wort in PROJEKTWOERTER:
         pruefe_text("Mutation Projektwort %r" % wort, "muster.yml",
                     MUSTER.replace("run: python3", "run: %s python3" % wort), True)
+
+    #  Gegenprobe zu 4: ".bas" ist eine Dateiendung und darf nur als solche
+    #  anschlagen. ".baseRefName" (ein jq-Feldzugriff auf baseRefName) traegt
+    #  dieselben vier Zeichen, ist aber kein VBA-Modul - ohne Wortgrenze nach
+    #  dem Treffer sprang Regel 4 hier faelschlich an (f-reiser/reiser-flow#7).
+    pruefe_text("Projektwort '.bas' ist keine Dateiendung hier", "muster.yml",
+                MUSTER.replace("run: python3",
+                               "run: echo .baseRefName python3"), False)
 
     #  Gegenprobe zu 1/2/4: In einem NICHT aufrufbaren Workflow ist all das erlaubt -
     #  dort meint github.workflow_ref die Datei selbst, und die eigene CI darf ihr
@@ -541,7 +563,7 @@ def selbsttest():
     if "runs-on" in aus or "workflow_call" not in aus:
         fehler.append("ausloeser_block(): falsch abgegrenzt (%r)" % aus[:80])
 
-    gesamt = (2 + len(FALSCHER_SELBSTBEZUG) + 1 + 1 + len(PROJEKTWOERTER)
+    gesamt = (2 + len(FALSCHER_SELBSTBEZUG) + 1 + 1 + len(PROJEKTWOERTER) + 1
               + 3 + 1 + 1 + 2 + 1 + 2 + 1 + 5 + 6)
     for f in fehler:
         print("FEHLER: " + f)
