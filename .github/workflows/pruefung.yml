@@ -74,6 +74,12 @@ jobs:
       - name: Modellwahl aus den Labels
         run: python .github/skripte/modellwahl.py --selbsttest
 
+      #  Entscheidet, ob ein "Rueckfrage"-Vorgang vom Nutzer oder von Claude
+      #  selbst kommt. Ein Fehler hier faellt sonst erst auf, wenn ein Lauf
+      #  seine eigene offene Frage wieder aufgreift (f-reiser/reiser-flow#53).
+      - name: Rueckfrage-Herkunft erkennen
+        run: python .github/skripte/rueckfrage_filtern.py --selbsttest
+
       #  Entscheidet, wer die Steuerlabel setzen darf. Ein Fehler hier faellt sonst erst
       #  auf, wenn jemand mit zu wenig oder zu viel Recht ein Label setzt - siehe
       #  label-waechter.yml.
