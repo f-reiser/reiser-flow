@@ -69,6 +69,12 @@ jobs:
       - name: Label-Katalog lesen
         run: python .github/skripte/labels_lesen.py --selbsttest
 
+      #  Entscheidet, was label-abgleich.yml in einem Zielprojekt anlegt,
+      #  umbenennt oder loescht. Ein Fehler hier faellt sonst erst in einem
+      #  fremden Projekt auf, das sich den Katalog von hier holt.
+      - name: Label-Abgleich planen
+        run: python .github/skripte/label_abgleich.py --selbsttest
+
       #  Modell und Aufwand entscheiden, was ein Lauf kostet. Ein Fehler in der Zuordnung
       #  von Label zu Modell faellt sonst erst an der Rechnung auf.
       - name: Modellwahl aus den Labels

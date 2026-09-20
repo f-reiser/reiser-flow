@@ -1,13 +1,17 @@
 name: Label-Abgleich
 
-# Wiederverwendbarer Workflow (workflow_call). Legt den Label-Katalog aus
-# labels.json in einem Projekt an - Farbe und Beschreibung inklusive. Ein
-# Projekt bindet ihn ein, wenn es den Katalog dieses Repositories uebernehmen
-# will:
+# Wiederverwendbarer Workflow (workflow_call). Bringt den Label-Katalog aus
+# labels.json in einem Projekt auf den aktuellen Stand - Farbe, Beschreibung,
+# Umbenennung und Loeschung nicht mehr gefuehrter Label inklusive (Logik in
+# .github/skripte/label_abgleich.py, f-reiser/reiser-flow#54). Ein Projekt
+# bindet ihn ein, wenn es den Katalog dieses Repositories uebernehmen will:
 #
 #   on:
 #     push:
+#       branches: [main]
 #       paths: [.github/workflows/label-abgleich.yml]
+#     schedule:
+#       - cron: "17 4 * * 1"   # woechentlich - siehe "WARUM AUCH cron:" unten
 #     workflow_dispatch:
 #   jobs:
 #     label-abgleich:
@@ -15,14 +19,18 @@ name: Label-Abgleich
 #       permissions:            # MUSS der Aufrufer setzen
 #         issues: write
 #
-# NUR ANLEGEN UND AENDERN, NIE LOESCHEN
-# gh label create --force legt an oder aktualisiert Farbe/Beschreibung, loescht
-# aber nie ein Label, das nicht (mehr) im Katalog steht. Ein Projekt kann
-# eigene, zusaetzliche Label fuehren, ohne dass dieser Abgleich sie entfernt -
-# und ein Tippfehler im Katalog kann hier nie ein bestehendes Label kosten.
-# GitHub-Standardlabel, die ein neues Repository mitbringt, raeumt dieser
-# Workflow deshalb bewusst nicht weg; das ist eine einmalige, von Hand
-# gepruefte Aufraeumaktion (f-reiser/reiser-flow#11), keine Automatik.
+# WARUM AUCH cron:, NICHT NUR push:
+# Ein reiner push-Trigger auf die eigene Wrapper-Datei greift nur, wenn ein
+# Projekt seinen Versions-Tag bewusst nachzieht - das ist wieder eine Sache,
+# an die der Nutzer denken muesste (f-reiser/reiser-flow#54, Kommentar). Mit
+# einem zusaetzlichen "schedule:" holt sich jedes einbindende Projekt jede
+# Aenderung am Katalog von selbst, sobald @<tag> auf eine neuere Fassung
+# zeigt - unabhaengig davon, ob im Projekt gerade sonst etwas passiert.
+#
+# WAS FARBE VS. BESCHREIBUNG UNTERSCHEIDET, WAS UMBENANNT UND WAS GELOESCHT
+# WIRD, STEHT NICHT HIER
+# Das ist die Logik von label_abgleich.py (Docstring dort) - diese Datei
+# verbindet sie nur mit "gh" und dem Ziel-Repository.
 #
 # WARUM DER AUFRUFER "paths:" SETZT, NICHT DIESE DATEI
 # Ein aufgerufener Workflow kennt seinen Aufruf-Kontext nicht - "paths:" auf
@@ -57,13 +65,9 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Katalog anlegen und aktualisieren
+      - name: Katalog abgleichen
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
-        run: |
-          S="$GITHUB_WORKSPACE/_reiser-flow/.github/skripte"
-          python3 "$S/labels_lesen.py" | while IFS=$'\t' read -r NAME FARBE BESCHREIBUNG; do
-            gh label create "$NAME" --color "$FARBE" --description "$BESCHREIBUNG" \
-              --repo "$REPO" --force
-          done
+          LABELS_JSON: ${{ github.workspace }}/_reiser-flow/.github/labels.json
+        run: python3 "$GITHUB_WORKSPACE/_reiser-flow/.github/skripte/label_abgleich.py"
