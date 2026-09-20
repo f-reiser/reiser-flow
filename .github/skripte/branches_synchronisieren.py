@@ -31,12 +31,32 @@ def konfliktdateien(repo):
     return [z for z in lauf.stdout.splitlines() if z.strip()]
 
 
+def betrifft_workflows(repo, branch, basis):
+    """True, wenn 'branch' gegenueber 'basis' eigene Aenderungen unter
+    .github/workflows/ mitbringt.
+
+    Das GITHUB_TOKEN eines Workflow-Laufs darf solche Aenderungen nicht
+    pushen, weil ihm die Berechtigung 'workflows' fehlt - der Push schlaegt
+    sonst fehl (f-reiser/reiser-flow#62). Der Drei-Punkt-Diff zeigt genau die
+    Commits, die 'branch' seit seiner Abspaltung von 'basis' selbst
+    beigetragen hat, nicht was 'basis' inzwischen an Workflow-Dateien enthaelt.
+    """
+    lauf = subprocess.run(
+        ["git", "-C", repo, "diff", "--name-only",
+         "origin/%s...origin/%s" % (basis, branch), "--", ".github/workflows"],
+        capture_output=True, text=True, check=True,
+    )
+    return bool(lauf.stdout.strip())
+
+
 def synchronisiere(repo, branch, basis="main"):
     """Rebase 'branch' auf 'basis' und pusht bei Erfolg nach origin.
 
-    Rueckgabe: ("aufgefrischt", []) oder ("konflikt", [dateien]). Ein
-    Rebase-Fehler ohne Konfliktdateien ist kein Konflikt, sondern ein
-    echter Git-Fehler und wird nicht stillschweigend geschluckt.
+    Rueckgabe: ("aufgefrischt", []), ("konflikt", [dateien]) oder
+    ("uebersprungen", []) fuer einen Branch mit eigenen Aenderungen an
+    Workflow-Dateien (siehe betrifft_workflows). Ein Rebase-Fehler ohne
+    Konfliktdateien ist kein Konflikt, sondern ein echter Git-Fehler und
+    wird nicht stillschweigend geschluckt.
 
     Nimmt an, dass 'repo' ein 'origin'-Remote mit 'branch' und 'basis' hat.
     """
@@ -45,6 +65,8 @@ def synchronisiere(repo, branch, basis="main"):
                                capture_output=True, text=True, check=check)
 
     git("fetch", "-q", "origin", branch, basis)
+    if betrifft_workflows(repo, branch, basis):
+        return "uebersprungen", []
     git("checkout", "-q", "-B", branch, "origin/%s" % branch)
     lauf = git("rebase", "origin/%s" % basis, check=False)
     if lauf.returncode == 0:
@@ -69,11 +91,14 @@ def main():
 
     aufgefrischt = []
     konflikte = []
+    uebersprungen = []
     for b in kandidaten:
         basis = basen.get(b, haupt)
         ergebnis, dateien = synchronisiere(repo, b, basis)
         if ergebnis == "aufgefrischt":
             aufgefrischt.append(b)
+        elif ergebnis == "uebersprungen":
+            uebersprungen.append(b)
         else:
             konflikte.append((b, dateien))
 
@@ -82,12 +107,15 @@ def main():
         with io.open(a, "a", encoding="utf-8") as f:
             f.write("aufgefrischt=%s\n" % ",".join(aufgefrischt))
             f.write("konflikte=%s\n" % ",".join(b for b, _ in konflikte))
+            f.write("uebersprungen=%s\n" % ",".join(uebersprungen))
 
     if aufgefrischt:
         print("Aufgefrischt: %s" % ", ".join(aufgefrischt))
+    if uebersprungen:
+        print("Uebersprungen (eigene Aenderung an Workflow-Dateien): %s" % ", ".join(uebersprungen))
     for b, dateien in konflikte:
         print("Konflikt auf %s: %s" % (b, ", ".join(dateien)))
-    if not aufgefrischt and not konflikte:
+    if not aufgefrischt and not konflikte and not uebersprungen:
         print("Nichts zu tun.")
     return 0
 
@@ -121,6 +149,7 @@ def _testrepo():
 
     git("branch", "sauber")
     git("branch", "kaputt")
+    git("branch", "workflow")
 
     #  main laeuft weiter: aendert 'geteilt.txt'
     io.open(os.path.join(arbeit, "geteilt.txt"), "w").write("zeile von main\n")
@@ -140,6 +169,15 @@ def _testrepo():
     io.open(os.path.join(arbeit, "geteilt.txt"), "w").write("zeile von kaputt\n")
     git("add", "geteilt.txt")
     git("commit", "-q", "-m", "kaputt aendert geteilt.txt anders")
+
+    #  workflow: eigener Commit unter .github/workflows -> das GITHUB_TOKEN
+    #  darf so etwas nicht pushen (fehlende 'workflows'-Berechtigung), der
+    #  Branch muss deshalb ausgespart werden (f-reiser/reiser-flow#62).
+    git("checkout", "-q", "workflow")
+    os.makedirs(os.path.join(arbeit, ".github", "workflows"), exist_ok=True)
+    io.open(os.path.join(arbeit, ".github", "workflows", "x.yml"), "w").write("name: x\n")
+    git("add", ".github/workflows/x.yml")
+    git("commit", "-q", "-m", "workflow aendert eine Workflow-Datei")
 
     git("checkout", "-q", "main")
 
@@ -184,13 +222,19 @@ def selbsttest():
                              capture_output=True, text=True, check=True).stdout
     pruefe("Arbeitsbaum nach abgebrochenem Rebase sauber", status.strip(), "")
 
+    ergebnis, dateien = synchronisiere(repo, "workflow", "main")
+    pruefe("Workflow-Aenderung wird ausgespart", ergebnis, "uebersprungen")
+    pruefe("keine Konfliktdateien fuer ausgesparten Branch", dateien, [])
+    pruefe("origin/workflow NICHT veraendert (kein Push versucht)",
+           _branch_commits(repo, "workflow")[0], "workflow aendert eine Workflow-Datei")
+
     #  main() nur ueber die tatsaechlich veralteten Branches - 'aktuell' bleibt
     #  unberuehrt, sonst wuerde jeder Lauf auch aktuelle Branches anfassen.
     import tempfile
     d = tempfile.mkdtemp()
     os.chdir(d)
     io.open("branches.txt", "w", encoding="utf-8").write(
-        "main\nsauber\naktuell\nkaputt\n")
+        "main\nsauber\naktuell\nkaputt\nworkflow\n")
     io.open("basen.txt", "w", encoding="utf-8").write("")
     os.environ["GITHUB_WORKSPACE"] = repo
     os.environ.pop("GITHUB_OUTPUT", None)
@@ -199,7 +243,7 @@ def selbsttest():
     rc = main()
     pruefe("main() beendet erfolgreich", rc, 0)
 
-    gesamt = 6
+    gesamt = 9
     for f in fehler:
         print("FEHLER: " + f)
     print("%d von %d Pruefungen bestanden." % (gesamt - len(fehler), gesamt))
