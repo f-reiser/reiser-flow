@@ -47,6 +47,12 @@ jobs:
       - name: Selbsttest des Issue-Autoclose-Workflows
         run: python .github/skripte/issue_autoclose.py --selbsttest
 
+      #  Nimmt ein geschuetztes Label zurueck, das laenger als fuenf Tage
+      #  ununterbrochen an einem Vorgang haengt. Ein Fehler hier faellt sonst
+      #  erst auf, wenn ein Auftrag faelschlich (oder gar nicht) zurueckgenommen wird.
+      - name: Selbsttest veraltete Auftraege
+        run: python .github/skripte/veraltete_auftraege.py --selbsttest
+
       #  Die Zuordnung entscheidet, an welchem Vorgang der naechste unbeaufsichtigte
       #  Lauf weiterarbeitet. Ein Fehler darin faellt sonst erst auf, wenn ein
       #  abgebrochener Vorgang doppelt angefangen wird.

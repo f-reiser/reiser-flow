@@ -1,0 +1,56 @@
+name: Veraltete Auftraege zuruecknehmen
+
+# Wiederverwendbarer Workflow (workflow_call). Ein Projekt bindet ihn per
+# Zeitplan ein:
+#
+#   on:
+#     schedule: [{ cron: "38 5 * * *" }]
+#     workflow_dispatch:
+#   jobs:
+#     veraltete-auftraege:
+#       uses: f-reiser/reiser-flow/.github/workflows/veraltete-auftraege.yml@<tag>
+#       permissions:            # MUSS der Aufrufer setzen
+#         issues: write
+#
+# Nimmt ein geschuetztes Label (Einarbeiten, Untersuche, Gegenlese -
+# labels_lesen.geschuetzte_einzelne() ist die einzige Quelle) zurueck, wenn es
+# laenger als fuenf Tage ununterbrochen an einem Vorgang haengt, ohne dass sich
+# sichtbar etwas getan hat (f-reiser/reiser-flow#23). Begruendung und die
+# Definition von "ununterbrochen" (Timeline, nicht Vorgangsalter):
+# .github/skripte/veraltete_auftraege.py.
+
+on:
+  workflow_call:
+
+permissions:
+  issues: write
+
+jobs:
+  veraltete-auftraege:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      #  Nur die Skripte, aus genau dem Commit, aus dem auch diese Datei
+      #  stammt (job.workflow_sha - im github-Kontext stuende der AUFRUFER,
+      #  siehe .github/pruefe_workflows.py).
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          repository: f-reiser/reiser-flow
+          ref: ${{ job.workflow_sha }}
+          path: _reiser-flow
+          sparse-checkout: |
+            .github/labels.json
+            .github/skripte
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Selbsttest
+        run: python3 _reiser-flow/.github/skripte/veraltete_auftraege.py --selbsttest
+
+      - name: Abgelaufene Label zuruecknehmen
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: python3 _reiser-flow/.github/skripte/veraltete_auftraege.py
