@@ -195,9 +195,9 @@ hier.
 
 ### Was in diesem Repository dazukommt
 
-`reiser-flow` veröffentlicht **zwei** Plugins unter derselben Nummer (`README.md` →
-„Versionierung"). Ein Release heißt hier deshalb: vier Stellen ziehen, zwei Tags setzen,
-**ein** GitHub-Release. Die Tags heißen `reiser-flow--v<version>` und
-`reiser-flow-lokal--v<version>` — der Teil vor `--v` ist der Plugin-Name, kein separat
-wählbarer Release-Name. Nennt ein Befehl einen Namen, der nach einer Umbenennung eines
-Plugins aussieht, ist das eine Rückfrage wert statt eines Ratens.
+`reiser-flow` veröffentlicht **zwei** Plugins unter derselben Nummer, mit **einem** Tag
+fürs ganze Repository (`README.md` → „Versionierung"). Ein Release heißt hier deshalb:
+vier Stellen ziehen (`semver-und-releases` → „Wo die Version steht"), **einen**
+annotierten Tag `v<version>` setzen (`git tag -a`, nicht `claude plugin tag` — das sähe
+je Aufruf nur eines der beiden Plugins), **ein** GitHub-Release. Es gibt daneben keinen
+separat wählbaren Release-Namen.
