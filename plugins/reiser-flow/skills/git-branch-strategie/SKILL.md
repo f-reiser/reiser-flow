@@ -85,7 +85,8 @@ mit beiden Fassungen und deiner Empfehlung.
 
 Das wirkt auch nach vorn: Bevorzuge Vorgehensweisen, die Konflikte gar nicht erst
 entstehen lassen — häufig rebasen, Änderungen klein und thematisch geschnitten halten,
-nicht nebenbei formatieren.
+nicht nebenbei formatieren. Bei binären oder sonst nicht mergbaren Dateien reicht das
+nicht: Sperren, Warnung und Ablehnungspflicht dafür stehen in `repo-hygiene`.
 
 ## Kurzbefehl: `Resolve`
 

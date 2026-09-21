@@ -3,15 +3,17 @@ name: repo-hygiene
 description: >
   Entscheidet, was in ein Git-Repository gehört und was nicht, über eine Whitelist-.gitignore
   statt einer Blacklist — plus die Kontrollen vor dem ersten Commit (Zugangsdaten,
-  personenbezogene Daten in Binärdateien, Zeilenenden) und das Vorgehen, wenn schon etwas
+  personenbezogene Daten in Binärdateien, Zeilenenden), Git LFS mit Sperren für binäre oder
+  sonst nicht mergbare Dateien (XML, Office-Formate), und das Vorgehen, wenn schon etwas
   Falsches im Repository gelandet ist. Nutze diesen Skill unbedingt, sobald es um `git init`,
   den ersten Commit, eine `.gitignore` oder `.gitattributes` oder das Veröffentlichen eines
   bestehenden lokalen Ordners auf GitHub/GitLab geht — und auch dann, wenn nur beiläufig
   gefragt wird, ob eine Datei, ein Ordner, eine Excel-/Word-Datei oder ein Testbericht „mit
   ins Repo soll". Ebenso bei jedem Commit, der Binärdateien, Office-Dokumente, Exporte oder
   Diagnoseausgaben enthält; wenn eine Datei entgegen der Erwartung nicht im Repository landet
-  oder ignoriert wird; und dringend, wenn Zugangsdaten, Schlüssel oder personenbezogene Daten
-  bereits committet oder gepusht wurden.
+  oder ignoriert wird; wenn zwei parallele Änderungen an derselben nicht mergbaren Datei
+  drohen oder Git LFS zur Debatte steht; und dringend, wenn Zugangsdaten, Schlüssel oder
+  personenbezogene Daten bereits committet oder gepusht wurden.
 ---
 
 # Was gehört ins Repository?
@@ -188,6 +190,38 @@ Große Binärdateien blähen jeden Klon dauerhaft auf, weil jede Fassung vollst�
 gespeichert wird — sie lassen sich nicht als Diff ablegen. Bei mehr als ein paar
 Megabyte: fragen, ob die Datei wirklich versioniert werden muss, oder ob Git LFS bzw. ein
 Ablageort außerhalb des Repositories richtiger ist.
+
+## Git LFS und Sperren bei nicht mergbaren Dateien
+
+Manche Dateien lassen sich nicht sinnvoll mergen — Binärformate wie Office-Dokumente
+oder Bilder, aber auch Textformate wie XML, wenn zwei parallele Änderungen an derselben
+Stelle nicht als Zeilen-Diff zusammenfinden. Ohne Gegenmaßnahme entscheidet dann nicht
+Git, welche Fassung gewinnt, sondern wer zuletzt pusht.
+
+**Nutzt das Projekt bereits Git LFS** (`git lfs env`, `.gitattributes` mit
+`filter=lfs`-Einträgen): Jede betroffene Datei gehört per LFS-Pattern erfasst, und jede
+Änderung läuft über eine Sperre — sonst bringt LFS für den Konfliktfall selbst nichts:
+
+```bash
+git lfs lock pfad/zur/datei      # vor der Änderung
+# ... ändern, committen, pushen ...
+git lfs unlock pfad/zur/datei    # danach
+```
+
+**Ist LFS verfügbar, aber im Projekt noch nicht eingerichtet:** Warne, sobald eine
+solche Datei auftaucht oder spätestens vor dem ersten Commit, dass Git LFS wegen der
+Merge-Konflikt-Gefahr dringend zu empfehlen ist, und liste die betroffenen Dateien auf.
+Die Entscheidung trifft der Admin des Projekts. Lehnt er ab, gilt ab da derselbe Umgang
+wie im nächsten Absatz.
+
+**Hat das Projekt keinen Zugriff auf Git LFS** (etwa ein privates Repository ohne
+LFS-Unterstützung, oder LFS wurde abgelehnt): Dann übernimmst du die Sperre von Hand, weil
+Git sie dir nicht abnimmt. Hat eine Anforderung bereits eine noch nicht nach `main`
+zurückgeführte Änderung an einer solchen Datei vorgenommen, lehnst du jede **weitere**
+Änderung an derselben Datei ab — mit einer Warnung auf den sonst unlösbaren Konflikt —,
+bis die erste Änderung in `main` gelandet ist. Welche Branches offen sind und was sie
+anfassen, prüfst du wie in `git-branch-strategie` beschrieben (`git ls-remote`, `gh pr
+list` samt `git diff --name-only` gegen `main`).
 
 ## Ein bestehender Ordner soll auf ein bestehendes Repository
 
