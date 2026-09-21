@@ -1,6 +1,6 @@
 # Auslöse-Test für repo-hygiene
 
-`trigger-evals.json` enthält 20 realistische Anfragen: zehn, bei denen der Skill
+`trigger-evals.json` enthält 22 realistische Anfragen: zwölf, bei denen der Skill
 greifen soll, und zehn Beinahe-Treffer, bei denen er es nicht soll (Git-Aufgaben ohne
 Hygienebezug, sowie eine Anonymisierung, die an `xlsx` gehört).
 
@@ -24,12 +24,13 @@ Wichtig ist, dass die konkurrierenden Skills realistisch mitgegeben werden — s
 misst man nur, ob die Beschreibung zum Thema passt, nicht ob sie sich gegen die
 Nachbarn durchsetzt.
 
-## Stand 06.09.2026
+## Stand 21.09.2026
 
 | Fassung | Auslöser erkannt | Fehlauslösungen |
 |---|---|---|
 | erste Beschreibung | 27/30 (90 %) | 0/30 |
-| überarbeitet | **30/30** | **0/30** |
+| überarbeitet | 30/30 | 0/30 |
+| + Git LFS/Sperren (f-reiser/reiser-flow#66) | **66/66** (3 Durchgänge à 22 Fälle) | **0/66** |
 
 Die erste Fassung verfehlte zwei Fälle, und beide zeigten eine echte inhaltliche Lücke,
 nicht nur eine Formulierungsschwäche:
@@ -45,3 +46,7 @@ nicht nur eine Formulierungsschwäche:
 Merksatz daraus: Ein verfehlter Auslöser ist zuerst ein Hinweis auf fehlenden Inhalt und
 erst danach auf eine schwache Beschreibung. Wer nur die Beschreibung nachschärft,
 bekommt einen Skill, der zwar greift, aber dann nichts zu sagen hat.
+
+Mit #66 kamen zwei Fälle zu Git LFS/nicht mergbaren Dateien dazu (IDs 11–12) und die
+Beschreibung bekam den passenden Satz. Alle drei Durchgänge trafen von Anfang an
+22/22 — hier lag der Inhalt schon vor der Beschreibung richtig.
