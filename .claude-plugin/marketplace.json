@@ -10,7 +10,7 @@
       "name": "reiser-flow",
       "source": "./plugins/reiser-flow",
       "description": "Arbeitsweise fuer alle Softwareprojekte: GitHub-Issue-Workflow, Branch-Strategie, Versionierung und Releases, Dokumentationsmass, Repo-Hygiene, testgetriebenes Vorgehen, fremde Gegenlese, Projektsprache.",
-      "version": "2.1.0",
+      "version": "2.2.0",
       "author": {
         "name": "f-reiser"
       }
@@ -19,7 +19,7 @@
       "name": "reiser-flow-lokal",
       "source": "./plugins/reiser-flow-lokal",
       "description": "Ergaenzung zu reiser-flow fuer Sitzungen am eigenen Rechner: Strukturarbeit ueber den Chat statt ueber Issues, Konten- und Repository-Ermittlung, Release-Befehle. Wird von unbeaufsichtigten GitHub-Laeufen bewusst nicht geladen.",
-      "version": "2.1.0",
+      "version": "2.2.0",
       "author": {
         "name": "f-reiser"
       }
