@@ -44,6 +44,8 @@ zweite Fassung — und die zweite Fassung ist die, die veraltet.
 - Er erzählt den Weg statt das Ergebnis („zuerst habe ich …, dann …")
 - Dieselbe Begründung steht an mehreren Stellen zugleich (Code-Kommentar UND
   Commit-Meldung UND PR-Text) statt an der einen, die laut Tabelle unten zuständig ist
+- Doku im Repo setzt einen Kontrast zur eigenen Vorgeschichte voraus, den nur versteht,
+  wer sie miterlebt hat
 
 **Beispiel.** Statt
 
@@ -58,6 +60,19 @@ reicht
 
 Der Rest war Begründung für eine Entscheidung, die niemand nachvollziehen muss —
 die gehört, wenn überhaupt, in die Commit-Meldung.
+
+**Beispiel für den Historienbezug.** Statt
+
+> Das Bot-Konto ist keiner mehr — es ist eine eigene GitHub App.
+
+reicht
+
+> Das Bot-Konto ist eine eigene GitHub App.
+
+Der Kontrast zum früheren Konto ergibt nur für jemanden Sinn, der die eigene Historie
+kennt — ein Projekt, das reiser-flow neu einbindet, hatte nie ein anderes Bot-Konto.
+Das gilt nur für Doku im Repo, die auch fremde Projekte lesen: In Commit-Meldung und
+Pull Request gehört Vorgeschichte gerade hin (siehe Tabelle unten).
 
 ## Wo was hingehört
 
