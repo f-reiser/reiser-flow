@@ -83,25 +83,34 @@ sind. Das ist nur auf der Maschine der Fall, auf der du selbst arbeitest.
 
 ## Welches Konto wofür — ermitteln, nicht nachschlagen
 
-Die Kontennamen stehen **absichtlich nirgends im Repository**: es ist öffentlich, und eine
-abgeschriebene Liste altert. Beides erledigt eine Abfrage:
+Das Admin-Konto ist ein gewöhnlicher, bei `gh` angemeldeter Nutzeraccount. Das Bot-Konto
+ist keiner mehr — es ist eine eigene **GitHub App**, installiert auf die Repositories der
+Organisation (siehe `git-branch-strategie` → „Mit welchem Konto"). Beide Zuordnungen
+stehen **absichtlich nirgends im Repository**: es ist öffentlich, und eine abgeschriebene
+Liste altert. Das erledigt eine Abfrage:
 
 ```bash
-gh auth status                                  # welche Konten sind angemeldet?
-gh api "repos/$(gh repo view --json nameWithOwner --jq .nameWithOwner)/collaborators/<login>/permission" --jq .permission
+gh auth status                                                            # welches Admin-Konto ist angemeldet?
+gh api "repos/$(gh repo view --json nameWithOwner --jq .nameWithOwner)/collaborators/<login>/permission" --jq .permission    # admin bestaetigen
+gh api "orgs/$(gh repo view --json owner --jq .owner.login)/installations" --jq '.installations[] | {app_slug, app_id, id}'  # installierte Apps
 ```
 
 | Antwort | Rolle | zuständig für |
 |---|---|---|
-| `admin` | Admin-Konto | Repository anlegen, Branch-Schutzregeln, Collaborators, Label, Issue-Typen — **vorher ansprechen** |
-| `write` | Bot-Konto | laufende Arbeit: Commits, Branches, Pull Requests, Issues, Releases |
+| `admin` (Collaborator-Permission) | Admin-Konto | Repository anlegen, Branch-Schutzregeln, Collaborators, Label, Issue-Typen — **vorher ansprechen** |
+| installierte App (eigener `app_slug`, nicht die offizielle `claude`-App o.ä.) | Bot-Konto | laufende Arbeit: Commits, Branches, Pull Requests, Issues, Releases |
+
+Eine Organisation kann mehrere Apps installiert haben, die nichts mit diesem Mechanismus
+zu tun haben (z. B. offizielle Anthropic-Integrationen) — an ihrem `app_slug` erkennbar.
+Welcher `app_slug` die eigene Bot-App ist, sowie App-ID, Installation-ID, der Pfad zum
+Private Key und zum Token-Skript gehören ebenfalls nicht hierher, sondern ins eigene,
+nicht öffentliche Memory — aus demselben Grund wie die Kontonamen.
 
 Das ist die konkrete Ausprägung von `git-branch-strategie` → „Mit welchem Konto": dort
-steht der Mechanismus mit den Platzhaltern `<Bot-Konto>` / `<Admin-Konto>`, hier steht,
-wie du sie füllst.
+steht der Mechanismus mit den Platzhaltern, hier steht, wie du sie füllst.
 
-Ergibt die Abfrage nicht genau ein `admin` und ein `write`, ist die Annahme dieses Skills
-verletzt — dann fragen statt raten.
+Ergibt die Abfrage nicht genau ein Admin-Konto mit `admin`-Permission und genau eine
+installierte Bot-App, ist die Annahme dieses Skills verletzt — dann fragen statt raten.
 
 ## Repositories in der Organisation
 

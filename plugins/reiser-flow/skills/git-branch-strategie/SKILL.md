@@ -277,31 +277,52 @@ das falsch aussieht, ohne dass es auffällt.
 | `git push` | wer pushen darf | Credential-Helper (folgt `GH_TOKEN`) |
 | Commit-Autor | was die Historie sagt | `user.name` / `user.email` |
 
-**Gilt nur, wenn die Sitzung diese Konten überhaupt anmelden kann** — geprüft mit
-`gh auth status`. Das ist bei einer lokalen Sitzung der Fall, nicht bei einer Sitzung, die
-ausschließlich innerhalb eines GitHub-Workflows läuft (claude-api/GitHub Actions): die
-handelt immer unter ihrem eigenen, vom Workflow bereitgestellten Token, hat keinen Zugriff
-auf eines der unten gemeinten Konten und sollte diesen ganzen Abschnitt überspringen statt
-einen Kontowechsel zu versuchen, der ins Leere läuft.
+**Gilt nur, wenn die Sitzung die jeweilige Identität überhaupt ansprechen kann.** Für das
+Admin-Konto heißt das: bei `gh` angemeldet, geprüft mit `gh auth status`. Für das
+Bot-Konto (siehe unten, eine GitHub App statt eines Nutzeraccounts) heißt das: Zugriff auf
+deren Private Key auf derselben Maschine. Eine Sitzung, die ausschließlich innerhalb eines
+GitHub-Workflows läuft (claude-api/GitHub Actions), hat keins von beidem — sie handelt
+immer unter ihrem eigenen, vom Workflow bereitgestellten Token und sollte diesen ganzen
+Abschnitt überspringen statt einen Kontowechsel zu versuchen, der ins Leere läuft.
 
-**Welche Konten das konkret sind, steht nicht hier.** Kontonamen sind personenbezogen;
-dieses Repository ist öffentlich. Die tatsächliche Zuordnung — welches Konto Bot, welches
-Admin, für welche Organisation — gehört in einen lokalen Skill außerhalb dieses
-Repositories. Hier steht nur der Mechanismus, mit Platzhaltern.
+**Welche Identitäten das konkret sind, steht nicht hier.** Kontonamen, App-Slug, App-ID,
+Installation-ID und der Pfad zum Private Key sind personenbezogen bzw. lokal;
+dieses Repository ist öffentlich. Die tatsächliche Zuordnung gehört in einen lokalen Skill
+außerhalb dieses Repositories bzw. ins eigene Memory. Hier steht nur der Mechanismus, mit
+Platzhaltern.
 
-**Laufende Arbeit** — Commits, Branches, Issues, Pull Requests, Tags und Releases —
-unter dem Bot-Konto:
+**Bot-Konto ist eine eigene GitHub App, kein Nutzeraccount.** Ein Machine User — ein
+zweiter, menschenähnlicher Account nur für Automatisierung — sieht für GitHub nach einem
+kompromittierten Konto aus, sobald er unregelmäßig und API-lastig auftritt, und wird von
+der Missbrauchserkennung irgendwann gesperrt. Eine GitHub App unterliegt dieser Erkennung
+nicht, lässt sich fein auf einzelne Rechte und Repositories scopen, und erscheint in
+Commits und Pull Requests klar erkennbar als `<App-Slug>[bot]` — getrennt von jedem
+menschlichen Konto, auch dem eigenen. Das macht Code-Review durch den Menschen erst
+möglich: GitHub verweigert Self-Review, aber ein Bot ist nie „man selbst".
+
+Statt eines Logins hat die App einen **Private Key** und wird über kurzlebige
+Installation-Tokens angesprochen (gültig etwa eine Stunde, danach neu einlösen) —
+**laufende Arbeit** heißt damit:
 
 ```bash
-export GH_TOKEN=$(gh auth token --user <Bot-Konto>)
-git -c user.name="<Bot-Konto>" \
-    -c user.email="<GitHub-User-ID>+<Bot-Konto>@users.noreply.github.com" \
+export GH_TOKEN="$(<Pfad-zum-Token-Skript> <App-ID> <Installation-ID> <Private-Key-Pfad>)"
+git -c user.name="<App-Slug>[bot]" \
+    -c user.email="<Bot-User-ID>+<App-Slug>[bot]@users.noreply.github.com" \
     commit -m "..."
 ```
 
-Die noreply-Adresse ist geprüft: GitHub verknüpft damit erstellte Commits mit dem
-Bot-Account, ohne dass eine private Adresse im Repository steht. Die User-ID liefert
-`gh api users/<Bot-Konto> --jq .id`.
+Das Token-Skript signiert ein kurzlebiges JWT (RS256, `iss` = App-ID) mit dem Private Key
+und tauscht es beim Erstellen gegen ein Installation-Token:
+
+```
+POST https://api.github.com/app/installations/<Installation-ID>/access_tokens
+Authorization: Bearer <JWT>
+```
+
+Die Bot-User-ID liefert einmalig `gh api "users/<App-Slug>[bot]" --jq .id` — sobald die
+App installiert ist, bekommt sie dafür einen eigenen Nutzereintrag vom Typ `Bot`. Die
+noreply-Adresse aus App-Slug und dieser ID ist geprüft: GitHub verknüpft damit erstellte
+Commits mit der App, ohne dass eine private Adresse im Repository steht.
 
 **Beim Ändern eines bestehenden Commits zusätzlich `--reset-author`:**
 
@@ -330,9 +351,11 @@ dafür, und ausgelöst wird es ohnehin nur, wenn der Nutzer „Release bauen" sa
 (`semver-und-releases`). Es läuft deshalb unter dem Bot-Konto wie jeder Commit.
 
 **Nicht mit dem Bot-Konto:** Repositories anlegen, Branch-Schutzregeln, Collaborators,
-Label und Issue-Typen einrichten. Das Bot-Konto hat dafür bewusst keine Rechte (`write`,
-kein `admin`). Solche Arbeiten laufen über das Admin-Konto und werden vorher angesprochen —
-`GH_TOKEN=$(gh auth token --user <Admin-Konto>)`.
+Label und Issue-Typen einrichten. Die App hat dafür bewusst keine Berechtigungen (kein
+`administration`, keine Organisationsrechte) — solche Arbeiten laufen über das Admin-Konto
+und werden vorher angesprochen — `GH_TOKEN=$(gh auth token --user <Admin-Konto>)`.
 
-`gh auth switch` ist hier das falsche Werkzeug: Es setzt einen globalen Zustand, den eine
-andere Sitzung verändert haben kann. Ein unbeaufsichtigter Lauf darf nicht davon abhängen.
+`gh auth switch` ist für das Admin-Konto das falsche Werkzeug: Es setzt einen globalen
+Zustand, den eine andere Sitzung verändert haben kann. Ein unbeaufsichtigter Lauf darf
+nicht davon abhängen. Für das Bot-Konto stellt sich die Frage ohnehin nicht — die App
+meldet sich nie bei `gh` an, ihr Token kommt ausschließlich über `GH_TOKEN`.

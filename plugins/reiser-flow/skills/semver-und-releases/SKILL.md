@@ -229,8 +229,8 @@ repo-lokal umstellen und danach wieder entfernen, damit sonstige Arbeit in diese
 nicht stillschweigend unter dem Bot läuft:
 
 ```bash
-git config --local user.name "<Bot-Konto>"
-git config --local user.email "<GitHub-User-ID>+<Bot-Konto>@users.noreply.github.com"
+git config --local user.name "<App-Slug>[bot]"
+git config --local user.email "<Bot-User-ID>+<App-Slug>[bot]@users.noreply.github.com"
 claude plugin tag --message "Release %s" --push
 git config --local --unset user.name
 git config --local --unset user.email
