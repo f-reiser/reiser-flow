@@ -38,6 +38,14 @@ name: Branches auffrischen
 # Fehlt eine Berechtigung beim Aufrufer, faellt "contents: write" zuerst auf:
 # Ohne sie kann der Rebase nicht gepusht werden, und jeder Branch landet als
 # Konflikt beim Modell - auch der, der sich klaglos rebasen liesse.
+#
+# WARUM HIER AUCH GIT-LFS-SPERREN FREIGEGEBEN WERDEN
+# Derselbe Trigger (Merge nach main) ist der richtige Zeitpunkt fuer beides:
+# eine Datei ist erst dann wieder frei, wenn ihre Aenderung auf main liegt
+# (repo-hygiene, f-reiser/reiser-flow#78). Ein eigener Workflow dafuer haette
+# dieselbe Trigger-Zeile in jedem einbindenden Projekt noch einmal gebraucht;
+# so bekommen ihn alle, die diesen Workflow schon einbinden, ohne eigenes
+# Zutun. Wirkungslos, wenn das Projekt kein Git LFS nutzt.
 
 on:
   workflow_call:
@@ -108,6 +116,16 @@ jobs:
             2>/dev/null > basen.txt || true
 
           python3 "$RUNNER_TEMP/reiser-flow/.github/skripte/branches_synchronisieren.py"
+
+      #  Reine Git-Arbeit, kein Claude: gibt Git-LFS-Sperren frei, deren
+      #  Pull Request gerade nach main gemergt wurde. Ohne Wirkung, wenn
+      #  dieser Lauf vom naechtlichen Zeitplan statt von einem Merge kommt,
+      #  oder wenn das Projekt kein Git LFS nutzt (f-reiser/reiser-flow#78).
+      - name: Git-LFS-Sperren freigeben
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_WORKSPACE: ${{ github.workspace }}
+        run: python3 "$RUNNER_TEMP/reiser-flow/.github/skripte/lfs_freigeben.py"
 
       #  Ersatzmass fuer die Dauer, nur gebraucht, wenn Claude ueberhaupt
       #  laeuft - dieselbe Begruendung wie in claude-aufgaben.yml.
