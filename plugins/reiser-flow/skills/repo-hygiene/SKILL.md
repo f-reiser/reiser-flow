@@ -207,9 +207,14 @@ kann eine parallele Änderung genau den Konflikt erzeugen, den die Sperre verhin
 
 ```bash
 git lfs lock pfad/zur/datei      # vor dem ersten Bearbeiten, vor dem ersten Commit
-# ... aendern, committen, pushen, Pull Request, Merge nach main ...
-git lfs unlock pfad/zur/datei    # erst wenn die Datei auf main liegt
+# ... aendern, committen, pushen, Pull Request ...
 ```
+
+**Das Aufheben (`git lfs unlock`) ist kein Schritt der eigenen Sitzung.** Zwischen Push
+und Merge nach `main` kann viel Zeit vergehen, und zum Merge-Zeitpunkt läuft in aller
+Regel keine Sitzung mehr, die das nachholen könnte. Das übernimmt ein automatisierter,
+an den Merge gekoppelter Workflow (f-reiser/reiser-flow#78) — dieselbe Stelle, die schon
+jeden offenen Branch nach einem Merge auf seine Basis bringt.
 
 **Ist LFS verfügbar, aber im Projekt noch nicht eingerichtet:** Warne, sobald eine
 solche Datei auftaucht oder spätestens vor dem ersten Commit, dass Git LFS wegen der
