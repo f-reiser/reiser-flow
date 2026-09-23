@@ -84,10 +84,10 @@ sind. Das ist nur auf der Maschine der Fall, auf der du selbst arbeitest.
 ## Welches Konto wofür — ermitteln, nicht nachschlagen
 
 Das Admin-Konto ist ein gewöhnlicher, bei `gh` angemeldeter Nutzeraccount. Das Bot-Konto
-ist keiner mehr — es ist eine eigene **GitHub App**, installiert auf die Repositories der
-Organisation (siehe `git-branch-strategie` → „Mit welchem Konto"). Beide Zuordnungen
-stehen **absichtlich nirgends im Repository**: es ist öffentlich, und eine abgeschriebene
-Liste altert. Das erledigt eine Abfrage:
+ist eine eigene **GitHub App**, installiert auf die Repositories der Organisation (siehe
+`git-branch-strategie` → „Mit welchem Konto"). Beide Zuordnungen stehen **absichtlich
+nirgends im Repository**: es ist öffentlich, und eine abgeschriebene Liste altert. Das
+erledigt eine Abfrage:
 
 ```bash
 gh auth status                                                            # welches Admin-Konto ist angemeldet?
