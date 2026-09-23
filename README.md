@@ -90,6 +90,26 @@ Was der Marketplace nicht abdeckt: claude.ai im Browser und auf dem Handy. Skill
 dort gebraucht werden, bleiben Konto-Skills — sie haben mit Softwareprojekten
 üblicherweise nichts zu tun.
 
+## Bot- und Admin-Konto
+
+Laufende Arbeit (Commits, Branches, Pull Requests, Issues, Releases) und administrative
+Arbeit (Repository anlegen, Branch-Schutz, Collaborators, Label) laufen unter getrennten
+Identitäten — sonst lässt sich in der Historie nicht mehr unterscheiden, was von einem
+Menschen und was von Claude stammt, und der Mensch kann eigene Pull Requests nicht mehr
+reviewen (GitHub verweigert Self-Review).
+
+**Das Bot-Konto ist eine eigene GitHub App, kein zweiter Nutzeraccount.** Ein Machine
+User — ein zweiter, menschenähnlicher Account nur für Automatisierung — sieht für GitHub
+bei unregelmäßiger, API-lastiger Aktivität nach einem kompromittierten Konto aus und wird
+von der Missbrauchserkennung irgendwann gesperrt. Eine GitHub App unterliegt dieser
+Erkennung nicht und erscheint in Commits und Pull Requests klar erkennbar als
+`<App-Slug>[bot]`.
+
+Der Mechanismus (Installation-Token, Commit-Identität) steht in `git-branch-strategie` →
+„Mit welchem Konto"; welches Konto in der eigenen Organisation wofür zuständig ist, in
+`f-reiser-strukturarbeit` → „Welches Konto wofür". Beides bewusst ohne Kontonamen — dieses
+Repository ist öffentlich.
+
 ## Wiederverwendbare Workflows
 
 Neben den Plugins liegt hier ausführbarer Code, den ein Projekt-Workflow über einen Tag
