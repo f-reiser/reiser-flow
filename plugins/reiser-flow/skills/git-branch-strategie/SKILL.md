@@ -263,8 +263,8 @@ Beim großen Feature ist der Merge-Commit richtig: Er hält die Zusammengehörig
 Teile fest und markiert, wo das Feature beginnt und endet — genau die Information, die man
 beim Eingrenzen mit `git bisect` braucht.
 
-**Gemergt wird vom Nutzer.** Nur wenn er es hier im Gespräch ausspricht, und dann für
-genau diesen einen Pull Request — nicht für den nächsten, nicht als Dauerregel.
+**Gemergt wird vom Nutzer.** Das ist ausnahmslos ein manueller Schritt, für jeden Pull
+Request — auch wenn der Nutzer im Gespräch zustimmt, dass du es stattdessen tust.
 
 ## Mit welchem Konto
 

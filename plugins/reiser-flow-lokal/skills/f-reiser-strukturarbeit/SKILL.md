@@ -180,23 +180,10 @@ Vorbereiten wieder — jeden mit dem, was du dabei tun würdest, und dazu die dr
 dass ohne Nummer abgeleitet wird, dass MAJOR immer bei ihm liegt, und welche Nummer
 aktuell in den Dateien steht. Kein Release, keine Änderung — nur die Antwort.
 
-### Die eine Ausnahme von „gemergt wird nur vom Nutzer"
+### Nach dem Merge des Versions-Pull-Requests
 
-Ein Pull Request, der **ausschließlich** Versionsnummern ändert, darf **selbst gemergt**
-werden. Diese Erlaubnis gilt für genau diese Art Pull Request und für keine andere — sie
-ist keine Lockerung von `git-branch-strategie`, sondern eine eng umrissene Ausnahme davon.
-
-Die Grenze ist wörtlich zu nehmen. Vor dem Merge nachsehen, nicht annehmen:
-
-```bash
-gh pr diff <nr>
-```
-
-Steht darin **irgendetwas** außer geänderten Versionsnummern — eine Doku-Anpassung, ein
-Verweis, ein nachgezogener Kommentar, eine Zeile in der Prüfung —, ist die Ausnahme
-verbraucht und es gilt wieder: **der Nutzer mergt.** Im Zweifel nicht mergen; ein
-wartender Pull Request kostet nichts, ein selbst gemergter zu viel Inhalt lässt sich nicht
-zurücknehmen.
+Auch der Pull Request, der nur die Versionsnummer ändert, mergt der Nutzer —
+`git-branch-strategie` kennt dafür keine Ausnahme.
 
 **Kam der Befehl aus der Spalte „Ein Release auslösen"**, folgt nach diesem Merge
 unmittelbar das Release nach `semver-und-releases`. Kam er aus „Nur vorbereiten", endet es
