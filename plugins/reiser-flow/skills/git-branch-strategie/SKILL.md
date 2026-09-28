@@ -350,6 +350,23 @@ Ein Release ist zwar eine Veröffentlichung, aber keine Verwaltungsarbeit: `push
 dafür, und ausgelöst wird es ohnehin nur, wenn der Nutzer „Release bauen" sagt
 (`semver-und-releases`). Es läuft deshalb unter dem Bot-Konto wie jeder Commit.
 
+**Workflow-Dateien (`.github/workflows/*`) sind mit dem Bot-Konto möglich, aber nur mit
+der Repository-Permission `Workflows: write`.** Ohne sie lehnt GitHub jeden Push ab, der
+so eine Datei ändert („refusing to allow a GitHub App to create or update workflow ...
+without 'workflows' permission") — unabhängig von `Contents: write`, das dafür nicht
+reicht. Das ist eine andere Einschränkung als die in `github-issue-workflow` →
+„Workflow-Dateien kann nur der Nutzer ändern": Jene gilt für einen unbeaufsichtigten Lauf
+mit dem `GITHUB_TOKEN` eines GitHub-Workflows und ist durch keine Permission aufhebbar.
+Eine lokale Sitzung mit einer entsprechend berechtigten App darf und soll Workflow-Dateien
+über das Bot-Konto ändern, nicht über das Admin-Konto ausweichen — sonst vermischt sich
+wieder Mensch- und Bot-Historie, genau das Problem, das die App lösen sollte.
+
+Fehlt die Permission (Fehlermeldung wie oben) und wird sie nachträglich ergänzt, wirkt das
+nicht sofort: `GET /app` (mit dem App-JWT) zeigt eine neu angeforderte Permission zwar
+sofort, `GET /app/installations/<Installation-ID>` aber erst, nachdem die Erweiterung in
+den Organisations-Einstellungen bestätigt wurde. Bis dahin bleibt der Fehler bestehen,
+obwohl die App-Konfiguration schon korrekt aussieht.
+
 **Nicht mit dem Bot-Konto:** Repositories anlegen, Branch-Schutzregeln, Collaborators,
 Label und Issue-Typen einrichten. Die App hat dafür bewusst keine Berechtigungen (kein
 `administration`, keine Organisationsrechte) — solche Arbeiten laufen über das Admin-Konto
