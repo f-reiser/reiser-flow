@@ -16,7 +16,7 @@ name: Label-Waechter
 #       permissions:            # MUSS der Aufrufer setzen
 #         issues: write
 #         pull-requests: write
-#         actions: read        # fuer den Pruefsummen-Cache (#23), siehe unten
+#         actions: write       # fuer den Pruefsummen-Cache (#23, #84), siehe unten
 #
 # Ein aufgerufener Workflow kann Berechtigungen nur beibehalten oder senken, nie
 # erhoehen - was der Aufrufer nicht gibt, bekommt dieser Job auch dann nicht, wenn
@@ -76,9 +76,12 @@ on:
 permissions:
   issues: write
   pull-requests: write
-  #  Fuer actions/cache/save (Pruefsumme, #23): der Cache-Dienst braucht
-  #  mindestens Lesezugriff auf die Actions-API des Laufs.
-  actions: read
+  #  Fuer actions/cache/save (Pruefsumme, #23): "read" reicht nicht - der
+  #  Cache-Dienst weist das Schreiben dann mit "token has no writable
+  #  scopes" zurueck, nur als Warnung, nicht als Fehlschlag des Schritts.
+  #  Die Pruefsumme landet dann nie im Cache, und jeder claude-aufgaben.yml-
+  #  Lauf bricht wegen einer fehlenden Pruefsumme ab (#84).
+  actions: write
 
 jobs:
   zuruecknehmen:
