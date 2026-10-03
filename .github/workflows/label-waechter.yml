@@ -239,7 +239,6 @@ jobs:
           REPO: ${{ github.repository }}
           NR: ${{ github.event.issue.number || github.event.pull_request.number }}
           WER: ${{ github.event.sender.login }}
-          WAS: ${{ github.event.action }}
         run: |
           S="$GITHUB_WORKSPACE/_reiser-flow/.github/skripte"
 
@@ -259,8 +258,8 @@ jobs:
             exit 0
           fi
 
-          printf 'Der Vorgang wurde nach der Freigabe geaendert (`%s` durch `%s`), deshalb sind die Auftragslabel abgenommen:%s\n\nDas ist kein Fehler - ein Vorgang darf sich aendern. Nur gilt die Freigabe dann der alten Fassung. Passt der Auftrag weiterhin, setzt der Nutzer das Label erneut; der Stand wird dabei neu festgehalten.\n' \
-            "$WAS" "$WER" "$ENTFERNT" > "$RUNNER_TEMP/abgenommen.md"
+          printf 'Der Vorgang wurde durch `%s` geaendert, daher automatisch zurueckgenommen:%s. Bitte Label erneut setzen.\n' \
+            "$WER" "$ENTFERNT" > "$RUNNER_TEMP/abgenommen.md"
           gh api --method POST "repos/$REPO/issues/$NR/comments" \
             -F "body=@$RUNNER_TEMP/abgenommen.md"
           echo "Abgenommen:$ENTFERNT (#$NR)"
