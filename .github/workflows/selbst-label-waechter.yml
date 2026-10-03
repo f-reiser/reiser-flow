@@ -20,4 +20,3 @@ jobs:
     permissions:
       issues: write
       pull-requests: write
-      actions: write
