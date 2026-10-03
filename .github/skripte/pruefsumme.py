@@ -30,14 +30,16 @@ WARUM BOT-KOMMENTARE NICHT ZAEHLEN
     meldete einen Angriff, wo nur sein Vorgaenger gearbeitet hat.
 
 WO DIE PRUEFSUMME LIEGT
-    Im Actions-Cache des Repositories, nicht in einem Kommentar: Eine
-    Pruefsumme ist ein Sicherheitsmerkmal, ein Kommentar waere fuer jeden mit
-    Lesezugriff einsehbar (f-reiser/reiser-flow#23, Ruecksprache vom
-    20.09.2026). label-waechter.yml legt sie beim Setzen des Auftragslabels
-    unter einem Schluessel ab, der die Vorgangsnummer traegt; claude-aufgaben.yml
-    holt sie sich per "restore-keys:"-Praefix zurueck - das Ablegen und
-    Restaurieren selbst ist Sache der Workflow-Datei (actions/cache), dieses
-    Skript sieht nur die lokale Datei, die dabei entsteht bzw. gebraucht wird.
+    Als Artefakt "pruefsumme-<nr>" des Waechter-Laufs, nicht in einem Kommentar:
+    Eine Pruefsumme ist ein Sicherheitsmerkmal, ein Kommentar waere fuer jeden
+    mit Lesezugriff einsehbar (f-reiser/reiser-flow#23, Ruecksprache vom
+    20.09.2026). Der Actions-Cache schied aus: Seit dem 26.06.2026 ist er fuer
+    "issues", "issue_comment" und "pull_request_target" schreibgeschuetzt, der
+    Waechter laeuft aber genau auf diesen Ausloesern (#84).
+
+    Ein Fork-PR darf Artefakte gleichen Namens hochladen. Gilt deshalb nur, was
+    ein Lauf mit dem Ausloeser des Waechters hochgeladen hat - dessen Workflow
+    kommt immer aus dem Standard-Branch (waehle_artefakt).
 """
 import hashlib
 import io
@@ -47,7 +49,10 @@ import re
 import subprocess
 import sys
 import tempfile
+import zipfile
 
+#  Name der Datei im Artefakt; label-waechter.yml laedt genau diese hoch.
+ARTEFAKT_DATEI = "pruefsumme-schreiben.txt"
 TRENNER = chr(10) + "----8<----" + chr(10)
 SUMME_ZEILE = re.compile(r"^([0-9a-f]{64})\s*$")
 
@@ -77,15 +82,39 @@ def pruefsumme(text):
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
-def gelesene_summe(pfad):
-    """Die im Actions-Cache abgelegte Pruefsumme aus der restaurierten Datei,
-    sonst None - fehlt sie (kein Cache-Treffer) oder ist sie kein sha256-Hex,
-    ist das gleichbedeutend mit "keine Pruefsumme abgelegt"."""
-    if not pfad or not os.path.isfile(pfad):
-        return None
-    inhalt = io.open(pfad, encoding="utf-8").read()
-    m = SUMME_ZEILE.match(inhalt.strip())
+def summe_aus_text(inhalt):
+    """Die Pruefsumme aus dem abgelegten Text, sonst None - ist sie kein
+    sha256-Hex, ist das gleichbedeutend mit "keine Pruefsumme abgelegt"."""
+    m = SUMME_ZEILE.match((inhalt or "").strip())
     return m.group(1) if m else None
+
+
+def summe_aus_zip(daten):
+    """Die Pruefsumme aus dem heruntergeladenen Artefakt (ein Zip mit genau
+    der Datei, die label-waechter.yml hochlaedt), sonst None."""
+    try:
+        with zipfile.ZipFile(io.BytesIO(daten)) as z:
+            return summe_aus_text(z.read(ARTEFAKT_DATEI).decode("utf-8"))
+    except (zipfile.BadZipFile, KeyError, UnicodeDecodeError):
+        return None
+
+
+#  Ausloeser, bei denen der Waechter eine Summe ablegt: ein Auftragslabel
+#  wird gesetzt ("labeled" gibt es nur bei diesen beiden).
+WAECHTER_AUSLOESER = ("issues", "pull_request_target")
+
+
+def waehle_artefakt(artefakte, event_von):
+    """Das juengste unabgelaufene Artefakt, das ein Waechter-Lauf hochgeladen
+    hat, sonst None. event_von(lauf_id) liefert den Ausloeser des Laufs oder
+    None."""
+    for art in sorted(artefakte, key=lambda a: a.get("created_at") or "",
+                      reverse=True):
+        if art.get("expired"):
+            continue
+        if event_von((art.get("workflow_run") or {}).get("id")) in WAECHTER_AUSLOESER:
+            return art
+    return None
 
 
 def uebergabetext(titel, body, kommentare):
@@ -121,6 +150,31 @@ def hole(repo, nr):
     k = json.loads(_gh("api", "--paginate",
                        "repos/%s/issues/%s/comments" % (repo, nr)) or "[]")
     return v.get("title"), v.get("body"), k
+
+
+def artefakt_summe(repo, nr):
+    """Die vom Waechter abgelegte Summe zu #nr, sonst None."""
+    antwort = json.loads(_gh("api", "-X", "GET",
+                             "repos/%s/actions/artifacts" % repo,
+                             "-f", "name=pruefsumme-%s" % nr,
+                             "-f", "per_page=100"))
+    events = {}
+
+    def event_von(lauf_id):
+        if lauf_id not in events:
+            try:
+                events[lauf_id] = json.loads(_gh(
+                    "api", "repos/%s/actions/runs/%s" % (repo, lauf_id))).get("event")
+            except RuntimeError:
+                events[lauf_id] = None
+        return events[lauf_id]
+
+    art = waehle_artefakt(antwort.get("artifacts") or [], event_von)
+    if art is None:
+        return None
+    lauf = subprocess.run(["gh", "api", "repos/%s/actions/artifacts/%s/zip"
+                           % (repo, art["id"])], capture_output=True)
+    return summe_aus_zip(lauf.stdout) if lauf.returncode == 0 else None
 
 
 def kommentieren(repo, nr, text, kommentar_id=None):
@@ -160,7 +214,7 @@ WARNUNG = (
 
 def schreiben(repo, nr, ausgabe_pfad):
     """Schreibt die aktuelle Pruefsumme in eine lokale Datei - der Workflow-
-    Schritt danach legt sie in den Actions-Cache (label-waechter.yml)."""
+    Schritt danach laedt sie als Artefakt hoch (label-waechter.yml)."""
     titel, body, kommentare = hole(repo, nr)
     summe = pruefsumme(relevanter_text(titel, body, kommentare))
     with io.open(ausgabe_pfad, "w", encoding="utf-8", newline="") as f:
@@ -169,18 +223,14 @@ def schreiben(repo, nr, ausgabe_pfad):
     return 0
 
 
-def pruefen(repo, kandidaten, ziel):
-    """kandidaten: [(nr, restore_pfad), ...] - restore_pfad ist die Datei, die
-    ein vorangehender "actions/cache/restore"-Schritt fuer diese Nummer
-    angelegt hat, oder ein nicht existierender Pfad ohne Cache-Treffer.
-
-    Vergleicht je Vorgang und legt den geprueften Text ab. Gibt die Liste der
-    Beanstandungen zurueck - leer heisst: alles stimmt."""
+def pruefen(repo, nummern, ziel, summe_von=artefakt_summe):
+    """Vergleicht je Vorgang und legt den geprueften Text ab. Gibt die Liste
+    der Beanstandungen zurueck - leer heisst: alles stimmt."""
     befunde = []
-    for nr, restore_pfad in kandidaten:
+    for nr in nummern:
         titel, body, kommentare = hole(repo, nr)
         ist = pruefsumme(relevanter_text(titel, body, kommentare))
-        soll = gelesene_summe(restore_pfad)
+        soll = summe_von(repo, nr)
         if soll is None:
             befunde.append((nr, "Es liegt keine Pruefsumme am Vorgang."))
             continue
@@ -195,18 +245,11 @@ def pruefen(repo, kandidaten, ziel):
     return befunde
 
 
-def lies_kandidaten_pruefsumme(pfad):
-    """[(nr, restore_pfad), ...] aus "<nr>\\t<restore_pfad>"-Zeilen."""
+def lies_nummern(pfad):
+    """Die Vorgangsnummern aus einer Datei mit einer Nummer je Zeile."""
     if not os.path.isfile(pfad):
         return []
-    ergebnis = []
-    for zeile in io.open(pfad, encoding="utf-8"):
-        zeile = zeile.rstrip(chr(10)).rstrip(chr(13))
-        if not zeile.strip():
-            continue
-        nr, _, rest = zeile.partition(chr(9))
-        ergebnis.append((nr.strip(), rest.strip()))
-    return ergebnis
+    return [z.strip() for z in io.open(pfad, encoding="utf-8") if z.strip()]
 
 
 def main():
@@ -214,7 +257,7 @@ def main():
     if "--schreiben" in sys.argv:
         return schreiben(repo, os.environ["NR"], os.environ["AUSGABE"])
 
-    kandidaten = lies_kandidaten_pruefsumme("kandidaten-pruefsumme.txt")
+    kandidaten = lies_nummern("kandidaten-pruefsumme.txt")
     befunde = pruefen(repo, kandidaten, os.environ.get("RUNNER_TEMP", "."))
     for nr, grund in befunde:
         print("::error::Pruefsumme von #%s stimmt nicht - %s" % (nr, grund))
@@ -253,7 +296,10 @@ def _k(body, typ="User", login="wer", id=1):
 def selbsttest():
     fehler = []
 
+    gesamt = [0]
+
     def pruefe(name, ist, soll):
+        gesamt[0] += 1
         if ist != soll:
             fehler.append("%s: %r statt %r" % (name, ist, soll))
 
@@ -286,38 +332,14 @@ def selbsttest():
            pruefsumme(relevanter_text("T", "ab", [_k("c")]))
            == pruefsumme(relevanter_text("T", "a", [_k("bc")])), False)
 
-    #  --- gelesene Summe (aus der restaurierten Cache-Datei) --------------
+    #  --- Summe aus dem Text ----------------------------------------------
+    pruefe("Summe aus dem Text", summe_aus_text("a" * 64 + chr(10)), "a" * 64)
+    pruefe("leerer Text -> keine Summe", summe_aus_text(""), None)
+    pruefe("kein Hex-Digest -> keine Summe", summe_aus_text("kein-sha256"), None)
+    pruefe("None -> keine Summe", summe_aus_text(None), None)
+
     import tempfile as _tempfile
     sha = "a" * 64
-    with _tempfile.TemporaryDirectory() as td:
-        vorhanden = os.path.join(td, "vorhanden.txt")
-        io.open(vorhanden, "w", encoding="utf-8", newline="").write(sha + chr(10))
-        pruefe("Summe aus der restaurierten Datei", gelesene_summe(vorhanden), sha)
-
-        leer = os.path.join(td, "leer.txt")
-        io.open(leer, "w", encoding="utf-8").write("")
-        pruefe("leere Datei -> keine Summe", gelesene_summe(leer), None)
-
-        muell = os.path.join(td, "muell.txt")
-        io.open(muell, "w", encoding="utf-8").write("kein-sha256")
-        pruefe("kein Hex-Digest -> keine Summe", gelesene_summe(muell), None)
-
-        pruefe("fehlende Datei -> keine Summe (kein Cache-Treffer)",
-               gelesene_summe(os.path.join(td, "gibtsnicht.txt")), None)
-        pruefe("leerer Pfad -> keine Summe", gelesene_summe(""), None)
-        pruefe("None -> keine Summe", gelesene_summe(None), None)
-
-    #  --- lies_kandidaten_pruefsumme() -------------------------------------
-    with _tempfile.TemporaryDirectory() as td:
-        pfad = os.path.join(td, "kandidaten-pruefsumme.txt")
-        io.open(pfad, "w", encoding="utf-8", newline="").write(
-            "31" + chr(9) + "/tmp/a.txt" + chr(10)
-            + chr(10)
-            + "7" + chr(9) + "/tmp/b.txt" + chr(10))
-        pruefe("Kandidaten eingelesen", lies_kandidaten_pruefsumme(pfad),
-               [("31", "/tmp/a.txt"), ("7", "/tmp/b.txt")])
-        pruefe("fehlende Datei -> leere Liste",
-               lies_kandidaten_pruefsumme(os.path.join(td, "nix.txt")), [])
 
     #  --- Uebergabetext ---------------------------------------------------
     ue = uebergabetext("Titel", "Body", [_k("Hallo", login="florian"),
@@ -342,10 +364,74 @@ def selbsttest():
     pruefe("Kommentarzeile zaehlt nicht als Aufruf",
            ruft_auf("#  pruefsumme.py --schreiben", "--schreiben"), False)
 
-    gesamt = 27
+    #  --- Artefakt waehlen (#84) ------------------------------------------
+    #  Der Cache ist fuer "issues"/"issue_comment" seit 26.06.2026 schreibgeschuetzt;
+    #  die Summe liegt deshalb als Artefakt des Waechter-Laufs.
+    def art(i, wann, lauf, abgelaufen=False):
+        return {"id": i, "created_at": wann, "expired": abgelaufen,
+                "workflow_run": {"id": lauf}}
+
+    events = {1: "issues", 2: "issues", 3: "pull_request", 4: "pull_request_target",
+              5: "issue_comment"}
+    ev = events.get
+    alt, neu_ = art(10, "2026-10-01T10:00:00Z", 1), art(11, "2026-10-02T10:00:00Z", 2)
+    pruefe("juengstes Artefakt gewinnt", (waehle_artefakt([alt, neu_], ev) or {}).get("id"), 11)
+    pruefe("Reihenfolge der Liste egal", (waehle_artefakt([neu_, alt], ev) or {}).get("id"), 11)
+    pruefe("abgelaufenes zaehlt nicht",
+           (waehle_artefakt([alt, art(12, "2026-10-03T10:00:00Z", 2, True)], ev) or {}).get("id"), 10)
+    #  Ein Fork-PR darf Artefakte gleichen Namens hochladen - sein Lauf hat aber
+    #  den Ausloeser "pull_request", nie "issues".
+    pruefe("Artefakt aus fremdem Ausloeser wird uebergangen",
+           (waehle_artefakt([alt, art(13, "2026-10-04T10:00:00Z", 3)], ev) or {}).get("id"), 10)
+    pruefe("pull_request_target ist ein Waechter-Ausloeser",
+           (waehle_artefakt([art(14, "2026-10-04T10:00:00Z", 4)], ev) or {}).get("id"), 14)
+    pruefe("issue_comment legt keine Summe ab",
+           waehle_artefakt([art(15, "2026-10-04T10:00:00Z", 5)], ev), None)
+    pruefe("unbekannter Lauf -> keine Summe",
+           waehle_artefakt([art(16, "2026-10-04T10:00:00Z", 99)], ev), None)
+    pruefe("keine Artefakte -> keine Summe", waehle_artefakt([], ev), None)
+
+    #  --- Summe aus dem heruntergeladenen Artefakt -------------------------
+    import zipfile as _zipfile
+    def zip_mit(name, inhalt):
+        puffer = io.BytesIO()
+        with _zipfile.ZipFile(puffer, "w") as z:
+            z.writestr(name, inhalt)
+        return puffer.getvalue()
+    pruefe("Summe aus dem Zip",
+           summe_aus_zip(zip_mit("pruefsumme-schreiben.txt", sha + chr(10))), sha)
+    pruefe("Zip mit Muell -> keine Summe",
+           summe_aus_zip(zip_mit("pruefsumme-schreiben.txt", "kein-sha256")), None)
+    pruefe("Zip ohne die erwartete Datei -> keine Summe",
+           summe_aus_zip(zip_mit("etwas-anderes.txt", sha)), None)
+    pruefe("kein Zip -> keine Summe", summe_aus_zip(b"das ist kein zip"), None)
+
+    #  --- Kandidaten: nur noch Nummern -------------------------------------
+    with _tempfile.TemporaryDirectory() as td:
+        pfad = os.path.join(td, "kandidaten-pruefsumme.txt")
+        io.open(pfad, "w", encoding="utf-8", newline="").write("31" + chr(10) + chr(10) + "7" + chr(10))
+        pruefe("Nummern eingelesen", lies_nummern(pfad), ["31", "7"])
+        pruefe("fehlende Datei -> keine Nummern", lies_nummern(os.path.join(td, "nix.txt")), [])
+
+    #  --- die Verdrahtung: kein Cache-Schreiben mehr im Waechter -----------
+    def ohne_kommentare(text):
+        return chr(10).join(z for z in text.split(chr(10)) if not z.lstrip().startswith("#"))
+    for datei, verboten, noetig in [("label-waechter.yml", "actions/cache/save", "actions/upload-artifact"),
+                                    ("claude-aufgaben.yml", "actions/cache/restore", None)]:
+        pfad = os.path.join(WURZEL, "workflows", datei)
+        try:
+            t = ohne_kommentare(io.open(pfad, encoding="utf-8").read())
+        except OSError as e:
+            fehler.append("%s nicht lesbar: %s" % (datei, e))
+            continue
+        if verboten in t:
+            fehler.append("%s nutzt noch %s" % (datei, verboten))
+        if noetig and noetig not in t:
+            fehler.append("%s nutzt %s nicht" % (datei, noetig))
+
     for f in fehler:
         print("FEHLER: " + f)
-    print("%d von %d Pruefungen bestanden." % (gesamt - len(fehler), gesamt))
+    print("%d von %d Pruefungen bestanden." % (gesamt[0] - len(fehler), gesamt[0]))
     return 1 if fehler else 0
 
 
